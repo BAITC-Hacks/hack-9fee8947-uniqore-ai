@@ -9,6 +9,7 @@ import {
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { GraphEdge, GraphNode, roles, shortId } from "./types";
 import { applyFilterHighlight, graphScope } from "./graphScope";
+import { inDateRange } from "./dateRange";
 
 export interface GraphHandle {
   fit: () => void;
@@ -330,10 +331,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       };
     });
     view.edges.forEach((e) => {
-      const active = e.daily.some((d) => {
-        const day = Number(d.date.slice(-2));
-        return day >= props.days[0] && day <= props.days[1];
-      });
+      const active = e.daily.some((d) => inDateRange(d.date, props.days));
       elements.push({
         data: {
           id: e.id,
@@ -485,11 +483,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     if (!cy) return;
     cy.batch(() =>
       props.edges.forEach((e) => {
-        const active = e.daily.some(
-          (d) =>
-            Number(d.date.slice(-2)) >= props.days[0] &&
-            Number(d.date.slice(-2)) <= props.days[1],
-        );
+        const active = e.daily.some((d) => inDateRange(d.date, props.days));
         cy.getElementById(e.id).toggleClass("inactive", !active);
       }),
     );

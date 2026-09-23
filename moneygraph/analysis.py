@@ -20,7 +20,7 @@ import pandas as pd
 
 from .clusters import CLUSTER_THRESHOLDS, explain_cluster
 
-ALGORITHM_VERSION = "1.1.0"
+ALGORITHM_VERSION = "1.2.0"
 ROLES = {
     "coordinator": "Координатор",
     "consolidator": "Консолидатор",
@@ -49,13 +49,19 @@ def json_write(path: Path, value: dict) -> None:
 
 
 def as_cents(series: pd.Series) -> pd.Series:
+    if not pd.api.types.is_numeric_dtype(series) or pd.api.types.is_bool_dtype(series):
+        raise DataError("sum_kzt: требуется числовой тип.")
     values = series.to_numpy(dtype=float)
     if not np.isfinite(values).all() or (values <= 0).any():
         raise DataError("Суммы переводов должны быть положительными конечными числами.")
     rounded = np.rint(values * 100)
     if (np.abs(values * 100 - rounded) > 0.001).any() or (rounded >= 2**63).any():
         raise DataError("Сумма не представима целым числом тиынов.")
-    return pd.Series(rounded.astype(np.int64), index=series.index)
+    cents = pd.Series(rounded.astype(np.int64), index=series.index)
+    # Pandas uses fixed-width sums. Check in Python before any aggregation.
+    if sum(int(value) for value in cents) > np.iinfo(np.int64).max:
+        raise DataError("Суммарный оборот превышает поддерживаемый диапазон тиынов.")
+    return cents
 
 
 def validate_frames(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame):
@@ -65,6 +71,8 @@ def validate_frames(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame):
         ("edges", edges, ["src", "dst", "sum_kzt", "n_tx", "depth"]),
         ("transactions", tx, ["src", "dst", "date", "sum_kzt"]),
     ]:
+        if not frame.columns.is_unique:
+            raise DataError(f"{name}: названия полей должны быть уникальны.")
         missing = sorted(set(columns) - set(frame.columns))
         if missing:
             raise DataError(f"{name}: отсутствуют поля {', '.join(missing)}")
@@ -73,6 +81,8 @@ def validate_frames(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame):
         for col in set(columns) & {"gid", "src", "dst", "depth", "n_tx"}:
             if not pd.api.types.is_integer_dtype(frame[col]):
                 raise DataError(f"{name}.{col}: требуется целочисленный тип.")
+            if not frame[col].between(-(2**63), 2**63 - 1).all():
+                raise DataError(f"{name}.{col}: значение выходит за диапазон int64.")
     if nodes.empty or nodes.gid.duplicated().any():
         raise DataError("nodes: нужны непустой набор и уникальные gid.")
     if not pd.api.types.is_bool_dtype(nodes.is_seed):
@@ -87,12 +97,19 @@ def validate_frames(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame):
     if (set(edges.src) | set(edges.dst) | set(tx.src) | set(tx.dst)) - known:
         raise DataError("В переводах найдены gid, отсутствующие в nodes.")
     edges["cents"], tx["cents"] = as_cents(edges.sum_kzt), as_cents(tx.sum_kzt)
+    if tx.empty:
+        raise DataError("transactions: нужна хотя бы одна транзакция.")
+    if pd.api.types.is_numeric_dtype(tx.date):
+        raise DataError("transactions.date: нужна календарная дата, а не число.")
     try:
-        tx["date"] = pd.to_datetime(tx.date, errors="raise")
-    except (ValueError, TypeError) as exc:
+        dates = pd.to_datetime(tx.date, errors="raise", format="mixed")
+        if dates.isna().any() or dates.dt.tz is not None:
+            raise ValueError("Missing or timezone-aware date")
+        tx["date"] = dates.dt.normalize()
+    except (ValueError, TypeError, AttributeError, OverflowError) as exc:
         raise DataError("transactions.date: некорректная дата.") from exc
-    if tx.empty or not tx.date.between("2026-07-01", "2026-07-31 23:59:59").all():
-        raise DataError("Ожидаются транзакции за июль 2026 года.")
+    if (tx.date.max() - tx.date.min()).days > 365:
+        raise DataError("Период транзакций должен быть не более 366 календарных дней.")
     if (tx.cents < 500_000).any():
         raise DataError("В выгрузке кейса переводы должны быть не меньше 5 000 KZT.")
     agg = tx.groupby(["src", "dst"], sort=True).agg(cents=("cents", "sum"), n_tx=("cents", "size"))
@@ -333,7 +350,7 @@ def analyze(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame, input_ha
         }[role]
         if boundary and role == "consolidator":
             evidence += " Выход обрезан 4-м коленом; гипотеза частичная."
-        limitations = ["Видны только внутрибанковские переводы от 5 000 ₸ за июль. Остатки и внешние потоки неизвестны."]
+        limitations = ["Видны только переводы из загруженной выборки от 5 000 ₸ за указанный период. Остатки и внешние потоки неизвестны."]
         if boundary:
             limitations.insert(0, "Граница выгрузки: дальнейшие исходящие переводы не наблюдаются.")
         if row.is_seed:
@@ -416,7 +433,8 @@ def analyze(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame, input_ha
                "n_seeds": int(nodes.is_seed.sum()), "n_isolated": int((~active).sum()),
                "n_boundary": int(nodes.depth.eq(4).sum()), "n_clusters": len(communities),
                "n_components": nx.number_weakly_connected_components(G),
-               "total_amount": int(edges.cents.sum()) / 100, "period_start": "2026-07-01", "period_end": "2026-07-31",
+               "total_amount": int(edges.cents.sum()) / 100,
+               "period_start": tx.date.min().date().isoformat(), "period_end": tx.date.max().date().isoformat(),
                "roles": dict(Counter(n["role"] for n in node_rows)),
                "duplicate_records_preserved": int(tx[["src", "dst", "date", "cents"]].duplicated().sum())}
     result = {"analysis_id": analysis_id, "algorithm_version": ALGORITHM_VERSION, "summary": summary,

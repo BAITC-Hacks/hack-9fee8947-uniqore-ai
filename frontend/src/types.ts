@@ -112,6 +112,9 @@ export interface Analysis {
   analysis_id: string;
   algorithm_version: string;
   dataset?: {
+    source?: "startup" | "uploaded";
+    transient?: boolean;
+    expires_in_seconds?: number;
     files: { name: string; sha256?: string }[];
     verification: { status: "passed" | "failed" | "unverified" };
     full_run_seconds?: number;
