@@ -1,0 +1,36 @@
+# Optional overlay for a public ngrok endpoint on the Linux Brev VM.
+# Combine with the repository's docker-compose.yml.
+services:
+  public-web:
+    image: ngrok/ngrok@sha256:14d80d083e5b53145f416bbbd36238336c9de4016c43fd950eb2eb845670583b
+    restart: unless-stopped
+    network_mode: host
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - http
+      - http://127.0.0.1:${TYUIN_PORT:-8765}
+      - --url=${TYUIN_NGROK_URL:?Set TYUIN_NGROK_URL to the domain assigned to your ngrok account}
+      - --config=/run/secrets/ngrok.yml
+      - --inspect=false
+      - --log=stdout
+      - --log-format=json
+    secrets:
+      - source: ngrok-config
+        target: ngrok.yml
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+secrets:
+  ngrok-config:
+    file: ${TYUIN_NGROK_CONFIG:?Set TYUIN_NGROK_CONFIG to the private ngrok config path}

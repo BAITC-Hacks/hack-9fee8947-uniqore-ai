@@ -1,0 +1,7 @@
+{
+	admin 127.0.0.1:2019
+}
+
+{$TYUIN_DOMAIN} {
+	reverse_proxy 127.0.0.1:{$TYUIN_PORT:8765}
+}
