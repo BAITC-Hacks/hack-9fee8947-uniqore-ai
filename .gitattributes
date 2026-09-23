@@ -1,0 +1,2 @@
+# Bundled vendor shaders contain intentional trailing spaces inside string literals.
+moneygraph/web/assets/** linguist-generated=true -whitespace
