@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import socket
 from types import SimpleNamespace
 from unittest.mock import Mock
 from urllib.error import URLError
@@ -160,3 +161,46 @@ def test_main_rejects_uncommitted_files_before_output_or_child(monkeypatch, caps
     assert "--untracked-files=all" in git.call_args_list[1].args[0]
     prepare.assert_not_called()
     run.assert_not_called()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX SO_REUSEADDR handles the server-side TIME_WAIT state")
+def test_port_is_free_after_accepted_connection_closes():
+    with socket.socket() as listener, socket.socket() as client:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.settimeout(2)
+        client.settimeout(2)
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+        listener.listen()
+        client.connect(("127.0.0.1", port))
+        connection, _ = listener.accept()
+        with connection:
+            # The server sends FIN first, leaving its port in TIME_WAIT once
+            # the peer closes. No sleeps or fixed ports are needed.
+            connection.shutdown(socket.SHUT_WR)
+            assert client.recv(1) == b""
+            client.close()
+            connection.settimeout(2)
+            assert connection.recv(1) == b""
+        listener.close()
+        assert smoke.port_is_free(port)
+
+
+def test_port_is_free_rejects_live_listener_without_disrupting_it():
+    with socket.socket() as listener, socket.socket() as client:
+        if os.name == "nt":
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        else:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.settimeout(2)
+        client.settimeout(2)
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+        listener.listen()
+        assert not smoke.port_is_free(port)
+        client.connect(("127.0.0.1", port))
+        connection, _ = listener.accept()
+        with connection:
+            connection.settimeout(2)
+            client.sendall(b"preserved")
+            assert connection.recv(9) == b"preserved"
