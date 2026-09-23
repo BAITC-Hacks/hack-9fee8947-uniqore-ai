@@ -119,11 +119,13 @@ docker compose --env-file .env.example down
 | Содержимое образа и пользователь | UID 10001; `.env`, `.git` и `docs` отсутствуют в `/app` |
 | Документация | Локальные ссылки и `git diff --check` проверены |
 
-Проверочные Compose-проекты использовали loopback-порты 18765 и 18766, пустые `LLM_*` и отдельные тома. Команда тестов для Bash из корня репозитория:
+Проверочные Compose-проекты использовали loopback-порты 18765 и 18766, пустые `LLM_*` и отдельные тома. Команда тестов для Bash из корня репозитория; начиная с PR #17 тестам нужны также `scripts/` и `results/`, которых нет в образе. На `78590c9` она даёт 89 passed ([проверка на чистой машине](../clean-machine-check.md)):
 
 ```bash
 docker run --rm --network none \
   --mount "type=bind,source=$(pwd)/tests,target=/app/tests,readonly" \
+  --mount "type=bind,source=$(pwd)/scripts,target=/app/scripts,readonly" \
+  --mount "type=bind,source=$(pwd)/results,target=/app/results,readonly" \
   tyuin:local python -m pytest -q -p no:cacheprovider /app/tests
 ```
 

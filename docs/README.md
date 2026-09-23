@@ -11,6 +11,7 @@
 - [Исходная проверка первой версии](finance/validation.md).
 - [Проверка сквозного демо и текущие ограничения](finance/demo-ux-validation.md).
 - [Деплой на NVIDIA Brev: Docker Compose и инструкция](deployment/brev.md).
+- [Проверка на чистой машине: Docker и команды README на Linux](clean-machine-check.md).
 - [Подсветка и фильтры клиентов: последующая проверка](finance/demo-filter-validation.md).
 - [Сценарий демонстрации](finance/demo.md).
 - [Agentic SDD pipeline: план разработки через Codex и Claude Code](agentic-sdd-pipeline/README.md).
