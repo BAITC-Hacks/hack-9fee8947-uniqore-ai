@@ -232,10 +232,14 @@ export function App() {
   if (!analysis)
     return (
       <div className="startup">
-        <div className="brand-symbol">
-          <Network size={29} />
-        </div>
-        <h1>Граф денег</h1>
+        <img
+          className="startup-logo"
+          src="/tyuin-logo.png"
+          alt="Tyuin — рысь-сыщик"
+          width="1774"
+          height="887"
+        />
+        <h1>Финансовые связи становятся понятными</h1>
         {error ? (
           <>
             <p>{error}</p>
@@ -255,9 +259,9 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="rail">
-        <div className="brand-symbol">
-          <GitBranch size={25} />
-        </div>
+        <a className="brand-symbol" href="/" aria-label="Tyuin — главная">
+          <img src="/tyuin-icon.png" alt="" width="48" height="48" />
+        </a>
         <div className="rail-middle">
           <button
             className={
@@ -285,15 +289,17 @@ export function App() {
         >
           <CircleHelp size={21} />
         </button>
-        <span className="rail-monogram">U.</span>
+        <span className="rail-monogram" aria-label="Tyuin">
+          T.
+        </span>
       </aside>
       <div className="app-body">
         <header className="topbar">
-          <a className="wordmark" href="/">
-            uniqore<span>.ai</span>
+          <a className="wordmark" href="/" aria-label="Tyuin — главная">
+            <img src="/tyuin-logo.png" alt="Tyuin" width="1774" height="887" />
           </a>
           <span className="header-divider" />
-          <span className="product-name">Граф денег</span>
+          <span className="product-name">Финансовые связи</span>
           <span className="workspace-pill">Рабочее пространство аналитика</span>
           <div className="header-right">
             <span className="local-status">

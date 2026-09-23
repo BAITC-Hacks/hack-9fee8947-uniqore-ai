@@ -20,7 +20,7 @@ class ExplainRequest(BaseModel):
 
 
 def create_app(result: dict, out: Path) -> FastAPI:
-    app = FastAPI(title="Граф денег", version=result["algorithm_version"], docs_url=None, redoc_url=None)
+    app = FastAPI(title="Tyuin · Финансовые связи", version=result["algorithm_version"], docs_url=None, redoc_url=None)
     exports = {name: (out / name).read_bytes() for name in OUTPUTS}
     node_index = {n["gid"]: n for n in result["nodes"]}
     transactions: dict[str, list] = {gid: [] for gid in node_index}
