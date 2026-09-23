@@ -9,13 +9,20 @@ from pathlib import Path
 from .analysis import DataError, json_write, load_and_analyze, verify_outputs, write_outputs
 
 
+def port_number(value: str) -> int:
+    port = int(value)
+    if not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError("Порт должен быть в диапазоне 1–65535.")
+    return port
+
+
 def main():
     parser = argparse.ArgumentParser(description="Tyuin: локальный анализ финансовых связей и интерфейс расследования")
     parser.add_argument("command", choices=["run", "demo", "verify"])
     parser.add_argument("--data", type=Path, default=Path("data"))
     parser.add_argument("--out", type=Path, default=Path("out"))
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=port_number, default=8765)
     args = parser.parse_args()
     try:
         if args.command == "verify":
