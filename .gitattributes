@@ -1,2 +1,6 @@
 # Bundled vendor shaders contain intentional trailing spaces inside string literals.
 moneygraph/web/assets/** linguist-generated=true -whitespace
+
+# Reference checksums are calculated over the canonical LF bytes on every OS.
+results/*.csv text eol=lf
+results/*.json text eol=lf
