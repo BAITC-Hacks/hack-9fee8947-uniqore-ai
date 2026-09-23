@@ -1,0 +1,20 @@
+name: tyuin
+
+services:
+  app:
+    image: ${TYUIN_IMAGE:-tyuin:local}
+    build:
+      context: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${TYUIN_BIND_ADDRESS:-127.0.0.1}:${TYUIN_PORT:-8765}:8765"
+    environment:
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    volumes:
+      - analysis-output:/app/out
+
+volumes:
+  analysis-output:

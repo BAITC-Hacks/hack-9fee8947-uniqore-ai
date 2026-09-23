@@ -1,0 +1,20 @@
+# Standalone file for Brev's Docker Compose upload/URL mode.
+# Build and publish the repository Dockerfile before selecting TYUIN_IMAGE.
+name: tyuin
+
+services:
+  app:
+    image: ${TYUIN_IMAGE:?Set TYUIN_IMAGE to a published Tyuin image tag or digest}
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${TYUIN_BIND_ADDRESS:-0.0.0.0}:${TYUIN_PORT:-8765}:8765"
+    environment:
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    volumes:
+      - analysis-output:/app/out
+
+volumes:
+  analysis-output:
