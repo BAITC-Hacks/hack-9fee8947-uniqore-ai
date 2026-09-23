@@ -42,7 +42,37 @@ def test_local_explanation_without_key(client, analysis):
     response = client.post(f'/api/nodes/{n["gid"]}/explain', json={"question": "role"})
     assert response.json()["text"] == n["evidence"]
     assert response.json()["mode"] == "local"
+    priority = client.post(f'/api/nodes/{n["gid"]}/explain', json={"question": "priority"}).json()
+    assert priority["text"] == n["why"] and "посредничество" in priority["text"]
     assert client.post(f'/api/nodes/{n["gid"]}/explain', json={"question": "invent"}).status_code == 422
+
+
+def test_dataset_passport_does_not_invent_verification_or_process_timing(client, analysis):
+    dataset = client.get("/api/analysis").json()["dataset"]
+    assert dataset["verification"]["status"] == "unverified"
+    assert "full_run_seconds" not in dataset
+    assert dataset["calculation_seconds"] == analysis["manifest"]["elapsed_seconds"]
+    assert {f["name"] for f in dataset["files"]} == {"nodes.parquet", "edges.parquet", "transactions.parquet"}
+    assert all(f["sha256"] == analysis["manifest"]["input_sha256"][f["name"]] for f in dataset["files"])
+    assert all("/" not in f["name"] for f in dataset["files"])
+
+
+@pytest.mark.parametrize("status,expected", [("passed", "passed"), ("failed", "failed"), ("unverified", "unverified"), ("unexpected", "unverified")])
+def test_dataset_passport_reports_explicit_verification(analysis, outputs, status, expected):
+    verified = {**analysis, "manifest": {**analysis["manifest"], "verification": {"status": status}, "full_run_seconds": 5.25}}
+    dataset = TestClient(create_app(verified, outputs)).get("/api/analysis").json()["dataset"]
+    assert dataset["verification"]["status"] == expected
+    assert dataset["full_run_seconds"] == 5.25
+    assert dataset["calculation_seconds"] == analysis["manifest"]["elapsed_seconds"]
+
+
+def test_group_api_uses_the_same_explanation_as_the_shared_snapshot(client, analysis):
+    graph = client.get("/api/analysis").json()
+    for expected in analysis["clusters"]:
+        response = client.get(f'/api/clusters/{expected["cluster_id"]}').json()
+        assert response["analysis_id"] == analysis["analysis_id"]
+        assert response["cluster"] == expected
+        assert next(c for c in graph["clusters"] if c["cluster_id"] == expected["cluster_id"]) == expected
 
 
 @pytest.mark.parametrize("mode", ["valid", "unknown_evidence", "bad_json", "timeout"])

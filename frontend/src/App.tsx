@@ -28,6 +28,12 @@ import {
 import { Graph, GraphHandle } from "./Graph";
 import { RoleExplanation } from "./RoleExplanation";
 import {
+  DatasetPassport,
+  PrioritySummary,
+  ClusterCard,
+  ReviewList,
+} from "./ScenarioPanels";
+import {
   Analysis,
   Dossier,
   GraphEdge,
@@ -70,15 +76,37 @@ export function App() {
   const [seedOnly, setSeedOnly] = useState(false);
   const [depthFilter, setDepthFilter] = useState("all");
   const [direction, setDirection] = useState<"both" | "in" | "out">("both");
-  const [leftTab, setLeftTab] = useState<"queue" | "clusters">("queue");
+  const [leftTab, setLeftTab] = useState<"queue" | "clusters" | "review">(
+    "queue",
+  );
+  const [queueView, setQueueView] = useState<"top" | "all">("top");
+  const [activeCluster, setActiveCluster] = useState<number | null>(null);
+  const [review, setReview] = useState<{ analysisId: string; gids: string[] }>({
+    analysisId: "",
+    gids: [],
+  });
+  const [searchNotice, setSearchNotice] = useState("");
+  const clusterReturn = useRef<{
+    selected: string;
+    leftTab: "queue" | "clusters" | "review";
+    scope: "ego" | "all";
+    roleFilter: string;
+    clusterFilter: string;
+    depthFilter: string;
+    seedOnly: boolean;
+    colorBy: "role" | "cluster";
+    query: string;
+    queueView: "top" | "all";
+    detailTab: "overview" | "priority" | "transactions" | "assistant";
+  } | null>(null);
   const [scope, setScope] = useState<"ego" | "all">("ego");
   const [hops, setHops] = useState(1);
   const [colorBy, setColorBy] = useState<"role" | "cluster">("role");
   const [days, setDays] = useState<[number, number]>(emptyDays);
   const [visible, setVisible] = useState(0);
   const [detailTab, setDetailTab] = useState<
-    "overview" | "transactions" | "assistant"
-  >("overview");
+    "overview" | "priority" | "transactions" | "assistant"
+  >("priority");
   const [exportOpen, setExportOpen] = useState(false);
   const [help, setHelp] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -97,7 +125,7 @@ export function App() {
 
   useEffect(() => {
     dossierScroll.current?.scrollTo(0, 0);
-  }, [selected, detailTab]);
+  }, [selected, detailTab, activeCluster]);
 
   useEffect(() => {
     setRowLimit(50);
@@ -120,7 +148,14 @@ export function App() {
       })
       .then((data: Analysis) => {
         setAnalysis(data);
-        setSelected([...data.nodes].sort((a, b) => a.rank - b.rank)[0].gid);
+        setSelected(
+          [...data.nodes].sort((a, b) => a.rank - b.rank)[0]?.gid || "",
+        );
+        setReview((current) =>
+          current.analysisId === data.analysis_id
+            ? current
+            : { analysisId: data.analysis_id, gids: [] },
+        );
       })
       .catch((e) => {
         if (e.name !== "AbortError") setError(e.message);
@@ -169,31 +204,55 @@ export function App() {
       ),
     [analysis, roleFilter, clusterFilter, seedOnly, depthFilter],
   );
-  const queue = useMemo(
-    () =>
-      (analysis?.nodes || [])
-        .filter((n) => allowed.has(n.gid) && n.gid.includes(query.trim()))
-        .sort((a, b) => a.rank - b.rank),
-    [analysis, allowed, query],
+  const orderedNodes = useMemo(
+    () => [...(analysis?.nodes || [])].sort((a, b) => a.rank - b.rank),
+    [analysis],
   );
-  const filteredClusters = useMemo(() => {
-    const members = new Map<number, GraphNode[]>();
-    for (const node of analysis?.nodes || []) {
-      if (!allowed.has(node.gid)) continue;
-      const group = members.get(node.cluster_id) || [];
-      group.push(node);
-      members.set(node.cluster_id, group);
+  const exactMatch = analysis?.nodes.find((n) => n.gid === query.trim());
+  const queue = useMemo(() => {
+    const search = query.trim();
+    if (search) {
+      const exact = orderedNodes.find((n) => n.gid === search);
+      return exact
+        ? [exact]
+        : orderedNodes.filter((n) => n.gid.includes(search));
     }
-    return (analysis?.clusters || [])
-      .map((cluster) => ({
-        ...cluster,
-        members: (members.get(cluster.cluster_id) || []).sort(
-          (a, b) => a.rank - b.rank,
-        ),
-      }))
-      .filter((cluster) => cluster.members.length > 0)
-      .sort((a, b) => b.members.length - a.members.length);
-  }, [analysis, allowed]);
+    return queueView === "top"
+      ? orderedNodes.slice(0, 20)
+      : orderedNodes.filter((n) => allowed.has(n.gid));
+  }, [orderedNodes, allowed, query, queueView]);
+  const filteredClusters = useMemo(
+    () =>
+      (analysis?.clusters || [])
+        .map((cluster) => ({
+          ...cluster,
+          members: orderedNodes.filter(
+            (n) => n.cluster_id === cluster.cluster_id,
+          ),
+        }))
+        .sort((a, b) => b.n_nodes - a.n_nodes || a.cluster_id - b.cluster_id),
+    [analysis, orderedNodes],
+  );
+  const shownCluster = filteredClusters.find(
+    (c) => c.cluster_id === activeCluster,
+  );
+  const graphAllowed = useMemo(
+    () =>
+      activeCluster === null
+        ? allowed
+        : new Set(
+            (analysis?.nodes || [])
+              .filter((n) => n.cluster_id === activeCluster)
+              .map((n) => n.gid),
+          ),
+    [activeCluster, allowed, analysis],
+  );
+  const reviewNodes =
+    review.analysisId === analysis?.analysis_id
+      ? review.gids
+          .map((gid) => analysis.nodes.find((n) => n.gid === gid))
+          .filter((n): n is GraphNode => Boolean(n))
+      : [];
   const cluster = analysis?.clusters.find(
     (c) => c.cluster_id === chosen?.cluster_id,
   );
@@ -203,7 +262,7 @@ export function App() {
       Number(t.date.slice(-2)) <= days[1] &&
       (!edge || (t.src === edge.src && t.dst === edge.dst)),
   );
-  const selectedOutside = chosen && !allowed.has(selected);
+  const selectedOutside = chosen && !graphAllowed.has(selected);
   const hasFilters =
     roleFilter !== "all" ||
     clusterFilter !== "all" ||
@@ -216,15 +275,99 @@ export function App() {
     setDepthFilter("all");
     setRowLimit(50);
   };
-  const choose = (gid: string) => {
+  const choose = (gid: string, global = false) => {
     setSelected(gid);
+    setActiveCluster(null);
+    setScope("ego");
     setEdge(null);
     setDetailTab("overview");
+    if (global || activeCluster !== null) {
+      clearFilters();
+      setDirection("both");
+      setHops(1);
+    }
+  };
+  const searchClient = (gid: string) => {
+    const outside = !allowed.has(gid);
+    choose(gid, true);
+    setLeftTab("queue");
+    setSearchNotice(
+      outside
+        ? "Клиент найден во всём наборе. Фильтры сброшены, показано его окружение."
+        : "Показано окружение клиента во всём наборе.",
+    );
+  };
+  const openCluster = (id: number) => {
+    if (activeCluster === null)
+      clusterReturn.current = {
+        selected,
+        leftTab,
+        scope,
+        roleFilter,
+        clusterFilter,
+        depthFilter,
+        seedOnly,
+        colorBy,
+        query,
+        queueView,
+        detailTab,
+      };
+    clearFilters();
+    setActiveCluster(id);
+    setLeftTab("clusters");
+    setScope("all");
+    setColorBy("role");
+    setQuery("");
+    setSearchNotice("");
+    setEdge(null);
+    const member = orderedNodes.find((n) => n.cluster_id === id);
+    if (member && chosen?.cluster_id !== id) setSelected(member.gid);
+  };
+  const closeCluster = () => {
+    const prior = clusterReturn.current;
+    setActiveCluster(null);
+    if (prior) {
+      setSelected(prior.selected);
+      setLeftTab(prior.leftTab);
+      setScope(prior.scope);
+      setRoleFilter(prior.roleFilter);
+      setClusterFilter(prior.clusterFilter);
+      setDepthFilter(prior.depthFilter);
+      setSeedOnly(prior.seedOnly);
+      setColorBy(prior.colorBy);
+      setQuery(prior.query);
+      setQueueView(prior.queueView);
+      setDetailTab(
+        prior.detailTab === "transactions" ? "overview" : prior.detailTab,
+      );
+    } else {
+      setLeftTab("queue");
+      setDetailTab("overview");
+    }
+  };
+  const toggleReview = (gid: string) => {
+    if (!analysis) return;
+    setReview((current) => {
+      const gids =
+        current.analysisId === analysis.analysis_id ? current.gids : [];
+      return {
+        analysisId: analysis.analysis_id,
+        gids: gids.includes(gid)
+          ? gids.filter((id) => id !== gid)
+          : [...gids, gid],
+      };
+    });
   };
   const onEdge = (e: GraphEdge) => {
+    if (activeCluster !== null) {
+      clearFilters();
+      setScope("ego");
+      setDirection("both");
+    }
+    setActiveCluster(null);
     if (selected !== e.src && selected !== e.dst) {
       pendingEdge.current = e;
-      setSelected(e.src);
+      setSelected(direction === "in" && scope === "ego" ? e.dst : e.src);
     } else setEdge(e);
     setDetailTab("transactions");
   };
@@ -317,10 +460,15 @@ export function App() {
               </button>
               {exportOpen && (
                 <div className="export-menu">
+                  <p className="export-scope">
+                    Весь набор · полный месяц.
+                    <br />
+                    Фильтры и перечень проверки не меняют CSV.
+                  </p>
                   {[
                     ["nodes_roles.csv", "Все узлы и роли"],
                     ["clusters.csv", "Сообщества"],
-                    ["top_nodes.csv", "Приоритетные узлы"],
+                    ["top_nodes.csv", "Топ-20 всего набора"],
                   ].map(([file, label]) => (
                     <a
                       key={file}
@@ -342,9 +490,19 @@ export function App() {
           </div>
         </header>
         <main>
+          <DatasetPassport
+            analysis={analysis}
+            onNetwork={() => {
+              clearFilters();
+              setActiveCluster(null);
+              setScope("all");
+              setLeftTab("clusters");
+              setQuery("");
+            }}
+          />
           <section
             className="workspace-filters"
-            aria-label="Фильтры списка и графа"
+            aria-label="Фильтры всех клиентов и графа"
           >
             <span className="filter-label">
               <Filter size={16} />
@@ -355,7 +513,13 @@ export function App() {
               <select
                 aria-label="Роль"
                 value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
+                onChange={(e) => {
+                  setRoleFilter(e.target.value);
+                  setActiveCluster(null);
+                  setQueueView("all");
+                  setLeftTab("queue");
+                  setQuery("");
+                }}
               >
                 <option value="all">Все роли</option>
                 {Object.entries(roles).map(([key, role]) => (
@@ -370,7 +534,13 @@ export function App() {
               <select
                 aria-label="Сообщество"
                 value={clusterFilter}
-                onChange={(e) => setClusterFilter(e.target.value)}
+                onChange={(e) => {
+                  setClusterFilter(e.target.value);
+                  setActiveCluster(null);
+                  setQueueView("all");
+                  setLeftTab("queue");
+                  setQuery("");
+                }}
               >
                 <option value="all">Все сообщества</option>
                 {analysis.clusters.map((c) => (
@@ -386,7 +556,13 @@ export function App() {
               <select
                 aria-label="Глубина"
                 value={depthFilter}
-                onChange={(e) => setDepthFilter(e.target.value)}
+                onChange={(e) => {
+                  setDepthFilter(e.target.value);
+                  setActiveCluster(null);
+                  setQueueView("all");
+                  setLeftTab("queue");
+                  setQuery("");
+                }}
               >
                 <option value="all">Любая глубина</option>
                 {[0, 1, 2, 3, 4].map((d) => (
@@ -404,7 +580,13 @@ export function App() {
               <input
                 type="checkbox"
                 checked={seedOnly}
-                onChange={(e) => setSeedOnly(e.target.checked)}
+                onChange={(e) => {
+                  setSeedOnly(e.target.checked);
+                  setActiveCluster(null);
+                  setQueueView("all");
+                  setLeftTab("queue");
+                  setQuery("");
+                }}
               />
               Только seed
             </label>
@@ -427,33 +609,54 @@ export function App() {
                   <Search size={15} />
                   <input
                     aria-label="Поиск по gid"
-                    placeholder="Найти клиента по gid"
+                    placeholder="Найти gid во всём наборе"
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
+                      setSearchNotice("");
                       setLeftTab("queue");
                       setRowLimit(50);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && queue[0]) {
-                        setLeftTab("queue");
-                        choose(queue[0].gid);
+                      if (e.key === "Enter") {
+                        if (exactMatch) searchClient(exactMatch.gid);
+                        else if (queue.length === 1) searchClient(queue[0].gid);
+                        else
+                          setSearchNotice(
+                            queue.length
+                              ? "Выберите клиента из совпадений или введите полный gid."
+                              : "Такого gid нет в предоставленном наборе.",
+                          );
                       }
                     }}
                   />
                   {query && (
-                    <button title="Очистить поиск" onClick={() => setQuery("")}>
+                    <button
+                      title="Очистить поиск"
+                      onClick={() => {
+                        setQuery("");
+                        setSearchNotice("");
+                      }}
+                    >
                       <X size={13} />
                     </button>
                   )}
                 </label>
               </div>
+              {searchNotice && (
+                <p className="search-notice" role="status">
+                  {searchNotice}
+                </p>
+              )}
               <div className="queue-tabs">
                 <button
                   className={leftTab === "queue" ? "active" : ""}
-                  onClick={() => setLeftTab("queue")}
+                  onClick={() => {
+                    if (activeCluster !== null) closeCluster();
+                    setLeftTab("queue");
+                  }}
                 >
-                  Приоритеты
+                  Клиенты
                 </button>
                 <button
                   className={leftTab === "clusters" ? "active" : ""}
@@ -462,17 +665,52 @@ export function App() {
                     setQuery("");
                   }}
                 >
-                  Сообщества
+                  Группы
+                </button>
+                <button
+                  className={leftTab === "review" ? "active" : ""}
+                  onClick={() => {
+                    setLeftTab("review");
+                    setQuery("");
+                  }}
+                >
+                  На проверку <span>{reviewNodes.length}</span>
                 </button>
               </div>
+              {leftTab === "queue" && !query.trim() && (
+                <div className="queue-mode" aria-label="Список клиентов">
+                  <button
+                    className={queueView === "top" ? "active" : ""}
+                    onClick={() => {
+                      setQueueView("top");
+                      clearFilters();
+                      setActiveCluster(null);
+                    }}
+                  >
+                    Топ-20 всего набора
+                  </button>
+                  <button
+                    className={queueView === "all" ? "active" : ""}
+                    onClick={() => setQueueView("all")}
+                  >
+                    Все клиенты
+                  </button>
+                </div>
+              )}
               <div className="list-caption">
                 <span>
                   {leftTab === "queue"
                     ? `${number(queue.length)} клиентов`
-                    : `${filteredClusters.length} сообществ`}
+                    : leftTab === "clusters"
+                      ? `${filteredClusters.length} групп · весь набор`
+                      : `${reviewNodes.length} выбрано вами`}
                 </span>
                 <span>
-                  {leftTab === "queue" ? "ПРИОРИТЕТ /100" : "В ВЫБОРКЕ"}
+                  {leftTab === "queue"
+                    ? "ПРИОРИТЕТ /100"
+                    : leftTab === "clusters"
+                      ? "КЛИЕНТОВ"
+                      : ""}
                 </span>
               </div>
               <div className="queue-list" ref={queueList}>
@@ -482,7 +720,13 @@ export function App() {
                       <button
                         key={n.gid}
                         className={`queue-item ${n.gid === selected ? "selected" : ""}`}
-                        onClick={() => choose(n.gid)}
+                        onClick={() => {
+                          if (query.trim()) searchClient(n.gid);
+                          else {
+                            choose(n.gid, queueView === "top");
+                            if (queueView === "top") setDetailTab("priority");
+                          }
+                        }}
                         title={n.gid}
                       >
                         <span className="rank">
@@ -499,6 +743,12 @@ export function App() {
                               ? roles[n.role].label
                               : `Гипотеза: ${roles[n.role].label}`}
                           </span>
+                          <small className="queue-reason">{n.why}</small>
+                          {reviewNodes.some((item) => item.gid === n.gid) && (
+                            <small className="review-marker">
+                              В перечне проверки
+                            </small>
+                          )}
                         </div>
                         <span className="queue-score">
                           {pct(n.priority_score)}
@@ -508,15 +758,16 @@ export function App() {
                     ))}
                     {queue.length === 0 && (
                       <div className="empty-list">
-                        Клиент не найден.
+                        {query.trim()
+                          ? "Такого gid нет в предоставленном наборе. Поиск охватывает всех клиентов."
+                          : "По текущим фильтрам клиентов нет."}
                         <br />
                         <button
-                          onClick={() => {
-                            clearFilters();
-                            setQuery("");
-                          }}
+                          onClick={() =>
+                            query.trim() ? setQuery("") : clearFilters()
+                          }
                         >
-                          Сбросить поиск и фильтры
+                          {query.trim() ? "Очистить поиск" : "Сбросить фильтры"}
                         </button>
                       </div>
                     )}
@@ -529,16 +780,19 @@ export function App() {
                       </button>
                     )}
                   </>
+                ) : leftTab === "review" ? (
+                  <ReviewList
+                    nodes={reviewNodes}
+                    analysisId={analysis.analysis_id}
+                    onSelect={(gid) => choose(gid, true)}
+                    onRemove={toggleReview}
+                  />
                 ) : (
                   filteredClusters.map((c) => (
                     <button
-                      className={`cluster-item ${String(c.cluster_id) === clusterFilter ? "selected" : ""}`}
+                      className={`cluster-item ${c.cluster_id === activeCluster ? "selected" : ""}`}
                       key={c.cluster_id}
-                      onClick={() => {
-                        setClusterFilter(String(c.cluster_id));
-                        setScope("all");
-                        choose(c.members[0].gid);
-                      }}
+                      onClick={() => openCluster(c.cluster_id)}
                     >
                       <span
                         className="cluster-glyph"
@@ -582,7 +836,15 @@ export function App() {
             <section className="graph-panel">
               <div className="graph-heading">
                 <div>
-                  <h2>Карта переводов</h2>
+                  <h2>
+                    {activeCluster !== null
+                      ? `Сообщество ${String(activeCluster).padStart(2, "0")}`
+                      : scope === "ego"
+                        ? "Окружение клиента"
+                        : hasFilters
+                          ? "Сеть по фильтрам"
+                          : "Вся сеть"}
+                  </h2>
                   <span>
                     {visible} из {number(analysis.summary.n_nodes)} узлов
                   </span>
@@ -590,13 +852,20 @@ export function App() {
                 <div className="segmented">
                   <button
                     className={scope === "ego" ? "active" : ""}
-                    onClick={() => setScope("ego")}
+                    onClick={() => {
+                      setActiveCluster(null);
+                      setScope("ego");
+                    }}
                   >
                     Окружение
                   </button>
                   <button
                     className={scope === "all" ? "active" : ""}
-                    onClick={() => setScope("all")}
+                    onClick={() => {
+                      setActiveCluster(null);
+                      clearFilters();
+                      setScope("all");
+                    }}
                   >
                     Вся сеть
                   </button>
@@ -628,9 +897,9 @@ export function App() {
                       setDirection(e.target.value as "both" | "in" | "out")
                     }
                   >
-                    <option value="both">Все связи</option>
-                    <option value="in">Входящие</option>
-                    <option value="out">Исходящие</option>
+                    <option value="both">Все направления</option>
+                    <option value="in">Входящие цепочки</option>
+                    <option value="out">Исходящие цепочки</option>
                   </select>
                 </label>
                 <label className="color-select">
@@ -653,19 +922,30 @@ export function App() {
                   nodes={analysis.nodes}
                   edges={analysis.edges}
                   selected={selected}
-                  onSelect={choose}
+                  selectedEdgeId={edge?.id}
+                  onSelect={(gid) => choose(gid)}
                   onEdge={onEdge}
                   scope={scope}
                   direction={direction}
                   hops={hops}
-                  allowed={allowed}
+                  allowed={graphAllowed}
                   colorBy={colorBy}
                   days={days}
                   onCount={setVisible}
                 />
                 <div className="canvas-top-note">
                   <span className="live-dot" />
-                  НАБЛЮДАЕМЫЕ СВЯЗИ
+                  {scope === "ego" && direction !== "both"
+                    ? direction === "in"
+                      ? "ВХОДЯЩИЕ МАРШРУТЫ"
+                      : "ИСХОДЯЩИЕ МАРШРУТЫ"
+                    : "НАБЛЮДАЕМЫЕ СВЯЗИ"}
+                  {scope === "ego" && (
+                    <span>
+                      {" "}
+                      · до {hops} {hops === 1 ? "перехода" : "переходов"}
+                    </span>
+                  )}
                 </div>
                 {chosen?.isolated && scope === "ego" && !selectedOutside && (
                   <div className="canvas-empty">
@@ -732,7 +1012,7 @@ export function App() {
                 <div className="timeline-heading">
                   <span>
                     <Activity size={14} />
-                    Активность клиента
+                    Операции клиента
                   </span>
                   <strong>
                     {String(days[0]).padStart(2, "0")} —{" "}
@@ -815,339 +1095,379 @@ export function App() {
                     <i className="in-dot" />
                     Вход
                     <i className="out-dot" />
-                    Выход · роли рассчитаны за весь месяц
+                    Выход
                   </span>
                   <span>31 июл</span>
                 </div>
               </div>
+              <p className="period-scope">
+                Даты меняют показ операций и яркость связей. Роли, приоритеты,
+                суммы и CSV — за весь месяц.
+              </p>
             </section>
             <aside className="dossier-panel">
-              {chosen && (
-                <>
-                  <div className="dossier-top">
-                    <div className="eyebrow">
-                      ДОСЬЕ КЛИЕНТА<span>#{chosen.rank}</span>
-                    </div>
-                    <div className="client-id">
-                      <h2 title={selected}>{selected}</h2>
-                      <button
-                        className="icon-button"
-                        title="Скопировать gid"
-                        onClick={() => {
-                          navigator.clipboard
-                            .writeText(selected)
-                            .then(() => setCopied(true));
-                        }}
-                      >
-                        {copied ? <Check size={16} /> : <Copy size={16} />}
-                      </button>
-                    </div>
-                    {selectedOutside && (
-                      <p className="outside-notice">
-                        Этот клиент вне текущей выборки
-                      </p>
-                    )}
-                    <div className="dossier-tags">
-                      <RoleBadge node={chosen} />
-                      <span className="depth-pill">
-                        {chosen.depth === 0
-                          ? "Исходный seed"
-                          : `${chosen.depth}-е колено`}
-                      </span>
-                    </div>
-                    <div className="priority-box">
-                      <div>
-                        <span>Приоритет проверки</span>
-                        <strong>
-                          {pct(chosen.priority_score)}
-                          <small>/100</small>
-                        </strong>
+              {shownCluster ? (
+                <ClusterCard
+                  cluster={shownCluster}
+                  members={shownCluster.members}
+                  onSelect={(gid) => choose(gid, true)}
+                  onBack={closeCluster}
+                />
+              ) : (
+                chosen && (
+                  <>
+                    <div className="dossier-top">
+                      <div className="eyebrow">
+                        ДОСЬЕ КЛИЕНТА<span>#{chosen.rank}</span>
                       </div>
-                      <div className="priority-track">
-                        <i
-                          style={{ width: `${pct(chosen.priority_score)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="detail-tabs">
-                    {(
-                      [
-                        ["overview", "Обзор"],
-                        ["transactions", "Операции"],
-                        ["assistant", "Ассистент"],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <button
-                        key={key}
-                        className={detailTab === key ? "active" : ""}
-                        onClick={() => {
-                          setDetailTab(key);
-                          if (key !== "transactions") setEdge(null);
-                        }}
-                      >
-                        {key === "assistant" && <Sparkles size={13} />} {label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="dossier-scroll" ref={dossierScroll}>
-                    {nodeError && <div className="error-box">{nodeError}</div>}
-                    {detailTab === "overview" && (
-                      <>
-                        <RoleExplanation
-                          node={
-                            dossier?.node.gid === chosen.gid
-                              ? dossier.node
-                              : chosen
-                          }
-                        />
-                        <div className="section-label">ПОТОКИ ЗА ИЮЛЬ</div>
-                        <div className="flow-grid">
-                          <div>
-                            <span>
-                              <ArrowDownLeft size={14} />
-                              Получено
-                            </span>
-                            <strong>
-                              {amount(chosen.in_amount)} <small>₸</small>
-                            </strong>
-                            <small>от {chosen.in_degree} клиентов</small>
-                          </div>
-                          <div>
-                            <span>
-                              <ArrowUpRight size={14} />
-                              Отправлено
-                            </span>
-                            <strong>
-                              {amount(chosen.out_amount)} <small>₸</small>
-                            </strong>
-                            <small>{chosen.out_degree} получателям</small>
-                          </div>
-                        </div>
-                        <div className="fact-row">
-                          <span>Достижимость от seed</span>
-                          <strong>{chosen.seed_reach}</strong>
-                        </div>
-                        <div className="fact-row">
-                          <span>Переводов: вход / выход</span>
-                          <strong>
-                            {chosen.in_tx} / {chosen.out_tx}
-                          </strong>
-                        </div>
-                        <div className="fact-row">
-                          <span>Объём с лагом 1–2 дня</span>
-                          <strong>{amount(chosen.matched_amount)} ₸</strong>
-                        </div>
-                        <p className="micro-note">
-                          Совместимость по времени не доказывает движение одних
-                          и тех же денег.
-                        </p>
-                        <details className="priority-detail">
-                          <summary>Из чего складывается приоритет</summary>
-                          {Object.entries(chosen.priority_factors).map(
-                            ([key, value]) => (
-                              <div className="priority-factor" key={key}>
-                                <span>
-                                  {
-                                    {
-                                      volume: "Объём",
-                                      bridge: "Посредничество",
-                                      seed_reach: "Связь с seed",
-                                      activity: "Активность",
-                                    }[key]
-                                  }
-                                </span>
-                                <i>
-                                  <b
-                                    style={{
-                                      width: `${(value / 0.35) * 100}%`,
-                                    }}
-                                  />
-                                </i>
-                                <strong>{(value * 100).toFixed(1)}</strong>
-                              </div>
-                            ),
-                          )}
-                        </details>
+                      <div className="client-id">
+                        <h2 title={selected}>{selected}</h2>
                         <button
-                          className="community-link"
+                          className="icon-button"
+                          title="Скопировать gid"
                           onClick={() => {
-                            setLeftTab("clusters");
-                            setQuery("");
-                            clearFilters();
-                            setClusterFilter(String(chosen.cluster_id));
-                            setScope("all");
+                            navigator.clipboard
+                              .writeText(selected)
+                              .then(() => setCopied(true))
+                              .catch(() =>
+                                setSearchNotice(
+                                  "Не удалось скопировать. Выделите полный gid в досье.",
+                                ),
+                              );
                           }}
                         >
-                          <span className="community-icon">
-                            <Layers size={18} />
-                          </span>
-                          <div>
-                            <strong>
-                              Сообщество{" "}
-                              {String(chosen.cluster_id).padStart(2, "0")}
-                            </strong>
-                            <small>
-                              {cluster?.n_nodes} узлов · {cluster?.n_seed} seed
-                            </small>
-                          </div>
-                          <ChevronRight size={16} />
+                          {copied ? <Check size={16} /> : <Copy size={16} />}
                         </button>
-                        <div className="limit-box">
-                          <AlertTriangle size={16} />
-                          <div>
-                            <strong>
-                              {chosen.boundary
-                                ? "Граница наблюдения"
-                                : chosen.is_seed
-                                  ? "Неполные входящие данные"
-                                  : "Гипотеза для проверки"}
-                            </strong>
-                            <p>{chosen.limitations[0]}</p>
-                          </div>
-                        </div>
-                        <div className="next-step">
-                          <span className="section-label">СЛЕДУЮЩИЙ ШАГ</span>
-                          <p>
-                            <CornerDownRight size={16} />
-                            {chosen.next_action}
-                          </p>
-                        </div>
-                        {cluster && (
-                          <details className="cluster-hypothesis">
-                            <summary>Гипотеза сообщества</summary>
-                            <p>{cluster.hypothesis}</p>
-                          </details>
-                        )}
-                      </>
-                    )}
-                    {detailTab === "transactions" && (
-                      <>
-                        <div className="section-label">
-                          ОПЕРАЦИИ · {filteredTx.length}
-                          {edge && (
-                            <button onClick={() => setEdge(null)}>
-                              Все связи <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                        <p className="micro-note">
-                          {days[0]}–{days[1]} июля · суммы из исходной выгрузки
+                      </div>
+                      {selectedOutside && (
+                        <p className="outside-notice">
+                          Этот клиент вне текущей выборки
                         </p>
-                        {edge && (
-                          <div className="edge-banner">
-                            {shortId(edge.src)} → {shortId(edge.dst)}
-                            <br />
-                            {fullAmount(
-                              filteredTx.reduce((sum, t) => sum + t.amount, 0),
-                            )}{" "}
-                            · Операций за период: {filteredTx.length}
-                          </div>
-                        )}
-                        {!dossier && !nodeError ? (
-                          <LoaderCircle className="spin" />
-                        ) : filteredTx.length === 0 ? (
-                          <div className="empty-transactions">
-                            В выбранном периоде операций нет.
-                          </div>
+                      )}
+                      <div className="dossier-tags">
+                        <RoleBadge node={chosen} />
+                        <span className="depth-pill">
+                          {chosen.depth === 0
+                            ? "Исходный seed"
+                            : `${chosen.depth}-е колено`}
+                        </span>
+                      </div>
+                      <div className="priority-box">
+                        <div>
+                          <span>Приоритет проверки</span>
+                          <strong>
+                            {pct(chosen.priority_score)}
+                            <small>/100</small>
+                          </strong>
+                        </div>
+                        <div className="priority-track">
+                          <i
+                            style={{ width: `${pct(chosen.priority_score)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        className={`review-toggle ${reviewNodes.some((n) => n.gid === chosen.gid) ? "added" : ""}`}
+                        onClick={() => toggleReview(chosen.gid)}
+                      >
+                        {reviewNodes.some((n) => n.gid === chosen.gid) ? (
+                          <Check size={14} />
                         ) : (
-                          filteredTx.slice(0, 150).map((t, i) => (
-                            <div key={t.ref + ":" + i} className="transaction">
-                              <span
-                                className={
-                                  t.dst === selected ? "tx-in" : "tx-out"
-                                }
-                              >
-                                {t.dst === selected ? (
-                                  <ArrowDownLeft size={16} />
-                                ) : (
-                                  <ArrowUpRight size={16} />
-                                )}
-                              </span>
-                              <div>
-                                <strong>{fullAmount(t.amount)}</strong>
-                                <button
-                                  onClick={() =>
-                                    choose(t.dst === selected ? t.src : t.dst)
-                                  }
-                                  title={t.dst === selected ? t.src : t.dst}
-                                >
-                                  {t.dst === selected ? "от" : "для"}{" "}
-                                  {shortId(t.dst === selected ? t.src : t.dst)}
-                                </button>
-                                <small title={t.ref}>Источник: {t.ref}</small>
-                              </div>
-                              <time>{date(t.date)}</time>
-                            </div>
-                          ))
+                          <Plus size={14} />
                         )}
-                        {filteredTx.length > 150 && (
-                          <p className="micro-note">
-                            Показаны первые 150 операций. Сузьте период для
-                            просмотра остальных.
-                          </p>
-                        )}
-                      </>
-                    )}
-                    {detailTab === "assistant" && (
-                      <div className="assistant">
-                        <div className="assistant-symbol">
-                          <Sparkles size={26} />
-                        </div>
-                        <h3>От фактов — к объяснению</h3>
-                        <p>
-                          {analysis.assistant_available
-                            ? "AI помогает прочитать готовое досье. Расчёты остаются источником результата."
-                            : "Локальные пояснения по рассчитанным фактам. Доступны без внешнего AI."}
-                        </p>
-                        <div className="assistant-questions">
-                          {(
-                            [
-                              ["role", "Почему эта роль?"],
-                              ["priority", "Почему этот приоритет?"],
-                              ["missing", "Каких данных не хватает?"],
-                            ] as const
-                          ).map(([q, label]) => (
-                            <button
-                              key={q}
-                              disabled={explaining}
-                              onClick={() => explain(q)}
-                            >
-                              {label}
-                              <ArrowUpRight size={14} />
-                            </button>
-                          ))}
-                        </div>
-                        {explaining && (
-                          <div className="assistant-loading">
-                            <LoaderCircle className="spin" size={17} />
-                            Готовим пояснение…
+                        {reviewNodes.some((n) => n.gid === chosen.gid)
+                          ? "В перечне · убрать"
+                          : "Добавить на проверку"}
+                      </button>
+                    </div>
+                    <div className="detail-tabs">
+                      {(
+                        [
+                          ["priority", "Приоритет"],
+                          ["overview", "Роль"],
+                          ["transactions", "Операции"],
+                          ["assistant", "Ассистент"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <button
+                          key={key}
+                          className={detailTab === key ? "active" : ""}
+                          onClick={() => {
+                            setDetailTab(key);
+                            if (key !== "transactions") setEdge(null);
+                          }}
+                        >
+                          {key === "assistant" && <Sparkles size={13} />}{" "}
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="dossier-scroll" ref={dossierScroll}>
+                      {nodeError && (
+                        <div className="error-box">{nodeError}</div>
+                      )}
+                      {detailTab === "priority" && (
+                        <>
+                          <PrioritySummary node={chosen} />
+                          <div className="next-step">
+                            <span className="section-label">СЛЕДУЮЩИЙ ШАГ</span>
+                            <p>
+                              <CornerDownRight size={16} />
+                              {chosen.next_action}
+                            </p>
                           </div>
-                        )}
-                        {explanation && (
-                          <div className="assistant-answer">
-                            <span>{explanation.label}</span>
-                            <p>{explanation.text}</p>
-                            {explanation.notice && (
-                              <small>{explanation.notice}</small>
+                          <p className="micro-note">{chosen.limitations[0]}</p>
+                          <button
+                            className="dossier-action-link"
+                            onClick={() => setDetailTab("overview")}
+                          >
+                            Гипотеза роли: {chosen.role_label}
+                            <ChevronRight size={14} />
+                          </button>
+                          <button
+                            className="dossier-action-link"
+                            onClick={() => openCluster(chosen.cluster_id)}
+                          >
+                            Разобрать сообщество{" "}
+                            {String(chosen.cluster_id).padStart(2, "0")}
+                            <ChevronRight size={14} />
+                          </button>
+                        </>
+                      )}
+                      {detailTab === "overview" && (
+                        <>
+                          <RoleExplanation
+                            node={
+                              dossier?.node.gid === chosen.gid
+                                ? dossier.node
+                                : chosen
+                            }
+                          />
+                          <div className="section-label">ПОТОКИ ЗА ИЮЛЬ</div>
+                          <div className="flow-grid">
+                            <div>
+                              <span>
+                                <ArrowDownLeft size={14} />
+                                Получено
+                              </span>
+                              <strong>
+                                {amount(chosen.in_amount)} <small>₸</small>
+                              </strong>
+                              <small>от {chosen.in_degree} клиентов</small>
+                            </div>
+                            <div>
+                              <span>
+                                <ArrowUpRight size={14} />
+                                Отправлено
+                              </span>
+                              <strong>
+                                {amount(chosen.out_amount)} <small>₸</small>
+                              </strong>
+                              <small>{chosen.out_degree} получателям</small>
+                            </div>
+                          </div>
+                          <div className="fact-row">
+                            <span>Достижимость от seed</span>
+                            <strong>{chosen.seed_reach}</strong>
+                          </div>
+                          <div className="fact-row">
+                            <span>Переводов: вход / выход</span>
+                            <strong>
+                              {chosen.in_tx} / {chosen.out_tx}
+                            </strong>
+                          </div>
+                          <div className="fact-row">
+                            <span>Объём с лагом 1–2 дня</span>
+                            <strong>{amount(chosen.matched_amount)} ₸</strong>
+                          </div>
+                          <p className="micro-note">
+                            Совместимость по времени не доказывает движение
+                            одних и тех же денег.
+                          </p>
+                          <button
+                            className="community-link"
+                            onClick={() => openCluster(chosen.cluster_id)}
+                          >
+                            <span className="community-icon">
+                              <Layers size={18} />
+                            </span>
+                            <div>
+                              <strong>
+                                Сообщество{" "}
+                                {String(chosen.cluster_id).padStart(2, "0")}
+                              </strong>
+                              <small>
+                                {cluster?.n_nodes} узлов · {cluster?.n_seed}{" "}
+                                seed
+                              </small>
+                            </div>
+                            <ChevronRight size={16} />
+                          </button>
+                          <div className="limit-box">
+                            <AlertTriangle size={16} />
+                            <div>
+                              <strong>
+                                {chosen.boundary
+                                  ? "Граница наблюдения"
+                                  : chosen.is_seed
+                                    ? "Неполные входящие данные"
+                                    : "Гипотеза для проверки"}
+                              </strong>
+                              <p>{chosen.limitations[0]}</p>
+                            </div>
+                          </div>
+                          <div className="next-step">
+                            <span className="section-label">СЛЕДУЮЩИЙ ШАГ</span>
+                            <p>
+                              <CornerDownRight size={16} />
+                              {chosen.next_action}
+                            </p>
+                          </div>
+                          {cluster && (
+                            <details className="cluster-hypothesis">
+                              <summary>Гипотеза сообщества</summary>
+                              <p>{cluster.hypothesis}</p>
+                            </details>
+                          )}
+                        </>
+                      )}
+                      {detailTab === "transactions" && (
+                        <>
+                          <div className="section-label">
+                            ОПЕРАЦИИ · {filteredTx.length}
+                            {edge && (
+                              <button onClick={() => setEdge(null)}>
+                                Все связи <X size={12} />
+                              </button>
                             )}
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="dossier-footer">
-                    <ShieldCheck size={13} />
-                    <span>Структурная гипотеза · не оценка виновности</span>
-                  </div>
-                </>
+                          <p className="micro-note">
+                            {days[0]}–{days[1]} июля · суммы из исходной
+                            выгрузки
+                          </p>
+                          {edge && (
+                            <div className="edge-banner">
+                              {shortId(edge.src)} → {shortId(edge.dst)}
+                              <br />
+                              {fullAmount(
+                                filteredTx.reduce(
+                                  (sum, t) => sum + t.amount,
+                                  0,
+                                ),
+                              )}{" "}
+                              · Операций за период: {filteredTx.length}
+                            </div>
+                          )}
+                          {!dossier && !nodeError ? (
+                            <LoaderCircle className="spin" />
+                          ) : filteredTx.length === 0 ? (
+                            <div className="empty-transactions">
+                              В выбранном периоде операций нет.
+                            </div>
+                          ) : (
+                            filteredTx.slice(0, 150).map((t, i) => (
+                              <div
+                                key={t.ref + ":" + i}
+                                className="transaction"
+                              >
+                                <span
+                                  className={
+                                    t.dst === selected ? "tx-in" : "tx-out"
+                                  }
+                                >
+                                  {t.dst === selected ? (
+                                    <ArrowDownLeft size={16} />
+                                  ) : (
+                                    <ArrowUpRight size={16} />
+                                  )}
+                                </span>
+                                <div>
+                                  <strong>{fullAmount(t.amount)}</strong>
+                                  <button
+                                    onClick={() =>
+                                      choose(t.dst === selected ? t.src : t.dst)
+                                    }
+                                    title={t.dst === selected ? t.src : t.dst}
+                                  >
+                                    {t.dst === selected ? "от" : "для"}{" "}
+                                    {shortId(
+                                      t.dst === selected ? t.src : t.dst,
+                                    )}
+                                  </button>
+                                  <small title={t.ref}>Источник: {t.ref}</small>
+                                </div>
+                                <time>{date(t.date)}</time>
+                              </div>
+                            ))
+                          )}
+                          {filteredTx.length > 150 && (
+                            <p className="micro-note">
+                              Показаны первые 150 операций. Сузьте период для
+                              просмотра остальных.
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {detailTab === "assistant" && (
+                        <div className="assistant">
+                          <div className="assistant-symbol">
+                            <Sparkles size={26} />
+                          </div>
+                          <h3>От фактов — к объяснению</h3>
+                          <p>
+                            {analysis.assistant_available
+                              ? "AI помогает прочитать готовое досье. Расчёты остаются источником результата."
+                              : "Локальные пояснения по рассчитанным фактам. Доступны без внешнего AI."}
+                          </p>
+                          <div className="assistant-questions">
+                            {(
+                              [
+                                ["role", "Почему эта роль?"],
+                                ["priority", "Почему этот приоритет?"],
+                                ["missing", "Каких данных не хватает?"],
+                              ] as const
+                            ).map(([q, label]) => (
+                              <button
+                                key={q}
+                                disabled={explaining}
+                                onClick={() => explain(q)}
+                              >
+                                {label}
+                                <ArrowUpRight size={14} />
+                              </button>
+                            ))}
+                          </div>
+                          {explaining && (
+                            <div className="assistant-loading">
+                              <LoaderCircle className="spin" size={17} />
+                              Готовим пояснение…
+                            </div>
+                          )}
+                          {explanation && (
+                            <div className="assistant-answer">
+                              <span>{explanation.label}</span>
+                              <p>{explanation.text}</p>
+                              {explanation.notice && (
+                                <small>{explanation.notice}</small>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="dossier-footer">
+                      <ShieldCheck size={13} />
+                      <span>Структурная гипотеза · не оценка виновности</span>
+                    </div>
+                  </>
+                )
               )}
             </aside>
           </section>
           <footer className="page-footer">
             <span>
               <i />
-              Расчёт завершён за {analysis.elapsed_seconds.toFixed(2)} с
+              Расчёт метрик: {analysis.elapsed_seconds.toFixed(2)} с
             </span>
             <span>Только наблюдаемые данные · без внешнего обогащения</span>
             <span>

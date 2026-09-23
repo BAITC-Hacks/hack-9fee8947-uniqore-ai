@@ -26,6 +26,7 @@ def main():
         write_outputs(result, args.out)
         verification = verify_outputs(args.data, args.out)
         result["manifest"]["full_run_seconds"] = round(time.perf_counter() - started, 4)
+        result["manifest"]["verification"] = {"status": "passed"}
         json_write(args.out / "manifest.json", result["manifest"])
         json_write(args.out / "analysis.json", result)
         print(json.dumps({**verification, "elapsed_seconds": result["manifest"]["full_run_seconds"], "out": str(args.out)}, ensure_ascii=False), flush=True)

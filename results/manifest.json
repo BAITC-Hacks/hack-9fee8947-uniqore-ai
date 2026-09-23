@@ -1,6 +1,6 @@
 {
-  "analysis_id": "ad6239d9995448b0",
-  "algorithm_version": "1.0.0",
+  "analysis_id": "0a1216eed5476f02",
+  "algorithm_version": "1.1.0",
   "input_sha256": {
     "nodes.parquet": "d2a45b0df6e9352832d5fb09839d10b9e23f898156c3bab263b051b31cc0296d",
     "edges.parquet": "4e71dde5cd3115bcb26e91202665532ee6581cf8233a9fc8059ea59fb7358a38",
@@ -25,7 +25,14 @@
       0.25,
       0.25,
       0.15
-    ]
+    ],
+    "cluster_hypothesis_thresholds": {
+      "fan_degree_min": 3,
+      "degree_dominance_min": 2,
+      "fan_turnover_share_min": 0.25,
+      "transit_balance_min": 0.8,
+      "transit_turnover_share_min": 0.25
+    }
   },
   "environment": {
     "python": "3.12.1",
@@ -37,11 +44,14 @@
       "pyarrow": "24.0.0"
     }
   },
-  "elapsed_seconds": 8.115,
+  "elapsed_seconds": 2.7744,
   "output_sha256": {
     "nodes_roles.csv": "482f5a94003c9ac811db932c3931600327c0cf5636a2f8c3eed382a2afe82297",
-    "clusters.csv": "7661365bd216b0ca4c0bc92fcccd51c367e3fcbf855114c1d9cc604850632e0e",
-    "top_nodes.csv": "83f53890172357deacf9fc46af03bc920c0170df2a9dca3b30364cf6e618260e"
+    "clusters.csv": "5471ad6e32a921f5b6e354386a4ec1847d62b70a47105a254ed086a30538deda",
+    "top_nodes.csv": "8ad548bb145a6741b06e20355a7cbc21dc69280fd9f76d5ad865b6c6e3981164"
   },
-  "full_run_seconds": 8.2655
+  "full_run_seconds": 3.2314,
+  "verification": {
+    "status": "passed"
+  }
 }

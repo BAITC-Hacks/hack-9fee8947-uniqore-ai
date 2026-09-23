@@ -1,0 +1,48 @@
+{
+  "command": "python -m moneygraph run --data data --out out",
+  "method": "Fresh Python process without a precomputed result; OS file cache not cleared. Includes imports, CSV export and verification; excludes dependency installation.",
+  "wall_seconds": 4.2752,
+  "pipeline_seconds": 3.2314,
+  "peak_child_rss_mib": 312.23,
+  "python": "3.12.1",
+  "system": "Darwin",
+  "machine": "arm64",
+  "analysis_id": "0a1216eed5476f02",
+  "input_sha256": {
+    "nodes.parquet": "d2a45b0df6e9352832d5fb09839d10b9e23f898156c3bab263b051b31cc0296d",
+    "edges.parquet": "4e71dde5cd3115bcb26e91202665532ee6581cf8233a9fc8059ea59fb7358a38",
+    "transactions.parquet": "c30c5317b5439591dde86f2058dc47a3d19b2900c055ded994fe547f6fb7e7da"
+  },
+  "summary": {
+    "n_nodes": 2248,
+    "n_edges": 3119,
+    "n_transactions": 4840,
+    "n_seeds": 81,
+    "n_isolated": 19,
+    "n_boundary": 444,
+    "n_clusters": 88,
+    "n_components": 35,
+    "total_amount": 365890012.01,
+    "period_start": "2026-07-01",
+    "period_end": "2026-07-31",
+    "roles": {
+      "consolidator": 96,
+      "unknown": 460,
+      "transit": 65,
+      "terminal": 1042,
+      "peripheral": 505,
+      "distributor": 31,
+      "coordinator": 49
+    },
+    "duplicate_records_preserved": 97
+  },
+  "boundary_comparison": {
+    "baseline_rule": "in_degree > 0 and out_degree == 0 => terminal",
+    "baseline_terminal": 1535,
+    "boundary_in_baseline_terminal": 444,
+    "boundary_assigned_terminal": 0,
+    "boundary_unknown": 441,
+    "boundary_partial_consolidator": 3,
+    "interpretation": "Structural comparison only; not an accuracy estimate without ground truth."
+  }
+}

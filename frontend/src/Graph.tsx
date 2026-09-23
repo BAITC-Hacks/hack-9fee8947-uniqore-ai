@@ -7,6 +7,7 @@ import {
 } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { GraphEdge, GraphNode, roles, shortId } from "./types";
+import { graphScope } from "./graphScope";
 
 export interface GraphHandle {
   fit: () => void;
@@ -16,6 +17,7 @@ interface Props {
   nodes: GraphNode[];
   edges: GraphEdge[];
   selected: string;
+  selectedEdgeId?: string;
   onSelect: (gid: string) => void;
   onEdge: (edge: GraphEdge) => void;
   scope: "ego" | "all";
@@ -87,9 +89,9 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
           style: {
             width: "data(width)",
             "line-color": "#d7dee7",
-            "target-arrow-color": "#c6d0dd",
+            "target-arrow-color": "#8c9fae",
             "target-arrow-shape": "triangle",
-            "arrow-scale": 0.95,
+            "arrow-scale": 1.25,
             "curve-style": "bezier",
             opacity: 0.75,
           },
@@ -120,6 +122,17 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
             "line-color": "#70b4bb",
             "target-arrow-color": "#408d98",
             opacity: 0.85,
+          },
+        },
+        {
+          selector: ".inspected-edge",
+          style: {
+            "line-color": "#245f6a",
+            "target-arrow-color": "#245f6a",
+            "underlay-color": "#70b4bb",
+            "underlay-opacity": 0.2,
+            "underlay-padding": 4,
+            opacity: 1,
           },
         },
         { selector: ".inactive", style: { opacity: 0.12 } },
@@ -177,25 +190,15 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
   useEffect(() => {
     const cy = instance.current;
     if (!cy) return;
-    const adjacency = new Map<string, Set<string>>();
-    props.edges.forEach((e) => {
-      if (!adjacency.has(e.src)) adjacency.set(e.src, new Set());
-      if (!adjacency.has(e.dst)) adjacency.set(e.dst, new Set());
-      if (props.direction !== "in") adjacency.get(e.src)!.add(e.dst);
-      if (props.direction !== "out") adjacency.get(e.dst)!.add(e.src);
-    });
-    let visible = new Set<string>(
-      props.scope === "all" ? props.allowed : [props.selected],
+    const view = graphScope(
+      props.edges,
+      props.allowed,
+      props.selected,
+      props.scope,
+      props.hops,
+      props.direction,
     );
-    if (props.scope === "ego")
-      for (let hop = 0; hop < props.hops; hop++) {
-        const next = new Set(visible);
-        visible.forEach((gid) =>
-          adjacency.get(gid)?.forEach((n) => next.add(n)),
-        );
-        visible = next;
-      }
-    visible = new Set([...visible].filter((gid) => props.allowed.has(gid)));
+    const visible = view.nodes;
     const shown = props.nodes.filter((n) => visible.has(n.gid));
     const clusterIds = [...new Set(shown.map((n) => n.cluster_id))].sort(
       (a, b) => a - b,
@@ -243,28 +246,26 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
         ].join(" "),
       };
     });
-    props.edges
-      .filter((e) => visible.has(e.src) && visible.has(e.dst))
-      .forEach((e) => {
-        const active = e.daily.some((d) => {
-          const day = Number(d.date.slice(-2));
-          return day >= props.days[0] && day <= props.days[1];
-        });
-        elements.push({
-          data: {
-            id: e.id,
-            source: e.src,
-            target: e.dst,
-            width: Math.min(3, 0.7 + Math.log10(1 + e.amount) / 5),
-          },
-          classes: [
-            e.src === props.selected || e.dst === props.selected
-              ? "selected-edge"
-              : "",
-            active ? "" : "inactive",
-          ].join(" "),
-        });
+    view.edges.forEach((e) => {
+      const active = e.daily.some((d) => {
+        const day = Number(d.date.slice(-2));
+        return day >= props.days[0] && day <= props.days[1];
       });
+      elements.push({
+        data: {
+          id: e.id,
+          source: e.src,
+          target: e.dst,
+          width: Math.min(3, 0.7 + Math.log10(1 + e.amount) / 5),
+        },
+        classes: [
+          e.src === props.selected || e.dst === props.selected
+            ? "selected-edge"
+            : "",
+          active ? "" : "inactive",
+        ].join(" "),
+      });
+    });
     cy.nodes().forEach((n) => {
       saved.current.set(`${renderedScope.current}:${n.id()}`, n.position());
     });
@@ -318,6 +319,23 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     }
     props.onCount(shown.length);
   }, [
+    props.nodes,
+    props.edges,
+    props.selected,
+    props.scope,
+    props.hops,
+    props.allowed,
+    props.colorBy,
+    props.direction,
+  ]);
+  useEffect(() => {
+    const cy = instance.current;
+    if (!cy) return;
+    cy.elements(".inspected-edge").removeClass("inspected-edge");
+    if (props.selectedEdgeId)
+      cy.getElementById(props.selectedEdgeId).addClass("inspected-edge");
+  }, [
+    props.selectedEdgeId,
     props.nodes,
     props.edges,
     props.selected,
