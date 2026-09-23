@@ -1505,15 +1505,20 @@ export function App() {
             </aside>
           </section>
           <footer className="page-footer">
-            <span>
-              <i />
-              Расчёт метрик: {analysis.elapsed_seconds.toFixed(2)} с
-            </span>
-            <span>Только наблюдаемые данные · без внешнего обогащения</span>
-            <span>
-              Анализ <code>{analysis.analysis_id.slice(0, 8)}</code> · v
-              {analysis.algorithm_version}
-            </span>
+            <div className="page-footer-meta">
+              <span>
+                <i />
+                Расчёт метрик: {analysis.elapsed_seconds.toFixed(2)} с
+              </span>
+              <span>Только наблюдаемые данные · без внешнего обогащения</span>
+              <span>
+                Анализ <code>{analysis.analysis_id.slice(0, 8)}</code> · v
+                {analysis.algorithm_version}
+              </span>
+            </div>
+            <p className="page-footer-credit">
+              Решение команды uniqore.ai на хакатоне hackalem.ai
+            </p>
           </footer>
         </main>
       </div>
