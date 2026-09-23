@@ -27,7 +27,7 @@
 
 Имя продукта — **Tyuin**. Внутренний Python-пакет `moneygraph` и команды запуска сохранены для совместимости. «Граф денег» — название кейса организатора.
 
-Нужен **Python 3.12 или новее**; для воспроизведения полного Windows-прогона используйте 3.12.14. Проверенные среды перечислены [ниже](#что-проверено). Node не нужен для просмотра: готовая сборка React включена в репозиторий. Первичная установка библиотек требует доступа к PyPI; дальнейший основной сценарий — без сети.
+Нужен **Python 3.12 или новее**, кроме 3.14.1: её исключает NetworkX 3.7 из `requirements.lock`. Для воспроизведения полного Windows-прогона используйте 3.12.14. Проверенные среды перечислены [ниже](#что-проверено). Node не нужен для просмотра: готовая сборка React включена в репозиторий. Первичная установка библиотек требует доступа к PyPI; дальнейший основной сценарий — без сети.
 
 Склонируйте репозиторий и перейдите в его корень:
 
@@ -41,24 +41,26 @@ cd hack-9fee8947-uniqore-ai
 **Windows, PowerShell:**
 
 ```powershell
-py -3.12 -m venv .venv
+py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock
 .\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\python.exe scripts/check_environment.py --profile runtime
 .\.venv\Scripts\python.exe -m moneygraph demo --data data --out out
 ```
 
-Активация окружения и изменение `ExecutionPolicy` не нужны. Если установлен Python 3.14, используйте `py -3.14 -m venv .venv`; он также поддерживается. Без launcher укажите полный путь к выбранному Python: [выбор интерпретатора, проверка и ошибки запуска](docs/local-launch.md).
+Активация окружения и изменение `ExecutionPolicy` не нужны. `py` без номера версии запускает Python по умолчанию, обычно новейший установленный; проверьте его командой `py --version`. Если он старше 3.12, укажите версию явно, например `py -3.12 -m venv .venv`; для повторения SDD-прогона используйте именно 3.12. Без launcher укажите полный путь к выбранному Python: [выбор интерпретатора, проверка и ошибки запуска](docs/local-launch.md).
 
 **macOS / Linux:**
 
 ```bash
-python3.12 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.lock
 python -m pip check
 python scripts/check_environment.py --profile runtime
 ```
+
+Если `python3 --version` показывает версию старше 3.12, создайте окружение нужным интерпретатором явно, например `python3.12 -m venv .venv`.
 
 После установки один запуск от исходных Parquet до CSV и интерфейса (в PowerShell он уже указан последней строкой выше):
 
