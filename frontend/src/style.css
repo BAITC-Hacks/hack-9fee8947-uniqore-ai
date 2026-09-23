@@ -1234,6 +1234,210 @@ main {
   border-radius: 13px;
   margin: 7px 0 17px;
 }
+.assistant-key-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: #657e9d;
+}
+.assistant-key-control.connected {
+  color: var(--accent);
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+}
+.assistant-connection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 11px;
+  color: #657e9d;
+}
+.assistant-connection.connected {
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.assistant-connection span,
+.assistant-connection button,
+.assistant-key-confirmation {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.assistant-connection button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 3px 0;
+}
+.assistant-context {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  font-size: 11px;
+  padding: 10px 0 0;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.assistant-message {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  background: #f6f9ff;
+}
+.assistant-message.user {
+  background: var(--accent-light);
+  margin-left: 18px;
+}
+.assistant-message > span {
+  font-size: 10px;
+  color: #657e9d;
+}
+.assistant-message p {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.assistant-message button,
+.assistant-error button,
+.assistant-loading button {
+  font-size: 11px;
+  color: var(--accent);
+  padding: 8px 0 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.assistant-loading button {
+  padding: 0;
+  margin-left: auto;
+}
+.assistant-error {
+  margin-top: 16px;
+}
+.assistant-composer {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+.assistant-composer label,
+.assistant-key-modal label {
+  font-size: 12px;
+  color: #657e9d;
+}
+.assistant-composer textarea,
+.assistant-key-modal input {
+  width: 100%;
+  border: 1px solid #dce6f2;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--navy);
+  padding: 12px;
+  font: inherit;
+  font-size: 12px;
+}
+.assistant-composer textarea {
+  resize: vertical;
+  min-height: 82px;
+  max-height: 220px;
+}
+.assistant-composer textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.assistant-composer .primary {
+  justify-self: end;
+  gap: 7px;
+}
+.assistant > .assistant-caption {
+  font-size: 10px;
+  line-height: 1.6;
+}
+.assistant-local {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.assistant-local summary {
+  cursor: pointer;
+  color: #657e9d;
+  font-size: 11px;
+}
+.assistant-local h4 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 14px 0 6px;
+}
+.assistant-local p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #657e9d;
+}
+.assistant-key-modal form {
+  margin-top: 20px;
+}
+.assistant-key-modal input {
+  margin-top: 8px;
+}
+.assistant-key-modal .error-box {
+  margin-top: 8px;
+}
+.assistant-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--accent-light);
+  color: var(--accent);
+  padding: 14px;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+.assistant-privacy-note p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.assistant-privacy-note a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.assistant-dialog-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+}
+.assistant-dialog-actions .primary,
+.assistant-key-modal > .primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+@media (max-width: 760px) {
+  .assistant-key-control {
+    padding: 6px;
+    font-size: 10px;
+  }
+  .assistant-key-control span {
+    max-width: 85px;
+    white-space: normal;
+    text-align: left;
+  }
+  .assistant-key-modal.method-modal {
+    padding: 28px 20px;
+  }
+}
 .assistant h3 {
   font-size: 14px;
   font-weight: 500;
@@ -1807,10 +2011,19 @@ main {
     padding: 8px 8px 0;
   }
   .topbar {
-    padding: 0 12px;
+    padding: 8px 12px;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 6px 12px;
   }
   .wordmark {
     font-size: 21px;
+    height: 42px;
+  }
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 5px;
   }
   .product-name,
   .header-divider {

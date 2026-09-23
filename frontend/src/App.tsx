@@ -15,6 +15,7 @@ import {
   Filter,
   GitBranch,
   Layers,
+  KeyRound,
   LoaderCircle,
   Plus,
   Search,
@@ -28,6 +29,7 @@ import {
 import { Graph, GraphHandle } from "./Graph";
 import { ClientRow } from "./ClientRow";
 import { RoleExplanation } from "./RoleExplanation";
+import { AssistantKeyDialog, AssistantPanel } from "./Assistant";
 import {
   DatasetPassport,
   PrioritySummary,
@@ -112,12 +114,8 @@ export function App() {
   const [help, setHelp] = useState(false);
   const [copied, setCopied] = useState(false);
   const [edge, setEdge] = useState<GraphEdge | null>(null);
-  const [explanation, setExplanation] = useState<{
-    text: string;
-    label: string;
-    notice?: string;
-  } | null>(null);
-  const [explaining, setExplaining] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [keyDialogOpen, setKeyDialogOpen] = useState(false);
   const [rowLimit, setRowLimit] = useState(50);
   const graph = useRef<GraphHandle>(null);
   const helpDialog = useRef<HTMLDialogElement>(null);
@@ -145,7 +143,14 @@ export function App() {
     if (help) helpDialog.current?.showModal();
     else helpDialog.current?.close();
   }, [help]);
-  const explanationRequest = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const clearKey = () => {
+      setApiKey("");
+      setKeyDialogOpen(false);
+    };
+    window.addEventListener("pagehide", clearKey);
+    return () => window.removeEventListener("pagehide", clearKey);
+  }, []);
   const pendingEdge = useRef<GraphEdge | null>(null);
 
   useEffect(() => {
@@ -176,12 +181,9 @@ export function App() {
     const abort = new AbortController();
     setDossier(null);
     setNodeError("");
-    setExplanation(null);
     setEdge(pendingEdge.current);
     pendingEdge.current = null;
     setCopied(false);
-    explanationRequest.current?.abort();
-    setExplaining(false);
     fetch(`/api/nodes/${selected}`, { signal: abort.signal })
       .then((r) => {
         if (!r.ok) throw Error("Не удалось открыть досье");
@@ -408,33 +410,6 @@ export function App() {
     } else setEdge(e);
     setDetailTab("transactions");
   };
-  const explain = async (question: "role" | "priority" | "missing") => {
-    explanationRequest.current?.abort();
-    const controller = new AbortController();
-    explanationRequest.current = controller;
-    setExplaining(true);
-    setExplanation(null);
-    const gid = selected;
-    try {
-      const r = await fetch(`/api/nodes/${gid}/explain`, {
-        signal: controller.signal,
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
-      });
-      if (!r.ok) throw Error();
-      const data = await r.json();
-      setExplanation(data);
-    } catch {
-      if (!controller.signal.aborted)
-        setExplanation({
-          text: "Не удалось получить пояснение. Все основания доступны на вкладке «Обзор».",
-          label: "Ошибка запроса",
-        });
-    } finally {
-      if (!controller.signal.aborted) setExplaining(false);
-    }
-  };
   if (!analysis)
     return (
       <div className="startup">
@@ -477,6 +452,18 @@ export function App() {
               <i />
               Локальный анализ
             </span>
+            <button
+              className={`assistant-key-control ${apiKey ? "connected" : ""}`}
+              onClick={() => setKeyDialogOpen(true)}
+              title={
+                apiKey
+                  ? "OpenAI: ключ задан в этой вкладке. Управление ключом"
+                  : "Подключить OpenAI"
+              }
+            >
+              <KeyRound size={15} />
+              <span>{apiKey ? "OpenAI · ключ задан" : "Подключить AI"}</span>
+            </button>
             <button
               className="help-button"
               aria-label="Справка и данные"
@@ -1268,6 +1255,8 @@ export function App() {
                           className={detailTab === key ? "active" : ""}
                           onClick={() => {
                             setDetailTab(key);
+                            if (key === "assistant" && !apiKey)
+                              setKeyDialogOpen(true);
                             if (key !== "transactions") setEdge(null);
                           }}
                         >
@@ -1483,50 +1472,27 @@ export function App() {
                         </>
                       )}
                       {detailTab === "assistant" && (
-                        <div className="assistant">
-                          <div className="assistant-symbol">
-                            <Sparkles size={26} />
-                          </div>
-                          <h3>От фактов — к объяснению</h3>
-                          <p>
-                            {analysis.assistant_available
-                              ? "AI помогает прочитать готовое досье. Расчёты остаются источником результата."
-                              : "Локальные пояснения по рассчитанным фактам. Доступны без внешнего AI."}
-                          </p>
-                          <div className="assistant-questions">
-                            {(
-                              [
-                                ["role", "Почему эта роль?"],
-                                ["priority", "Почему этот приоритет?"],
-                                ["missing", "Каких данных не хватает?"],
-                              ] as const
-                            ).map(([q, label]) => (
-                              <button
-                                key={q}
-                                disabled={explaining}
-                                onClick={() => explain(q)}
-                              >
-                                {label}
-                                <ArrowUpRight size={14} />
-                              </button>
-                            ))}
-                          </div>
-                          {explaining && (
-                            <div className="assistant-loading">
-                              <LoaderCircle className="spin" size={17} />
-                              Готовим пояснение…
-                            </div>
-                          )}
-                          {explanation && (
-                            <div className="assistant-answer">
-                              <span>{explanation.label}</span>
-                              <p>{explanation.text}</p>
-                              {explanation.notice && (
-                                <small>{explanation.notice}</small>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <AssistantPanel
+                          key={`${analysis.analysis_id}:${chosen.gid}`}
+                          apiKey={apiKey}
+                          node={
+                            dossier?.node.gid === chosen.gid &&
+                            dossier.analysis_id === analysis.analysis_id
+                              ? dossier.node
+                              : chosen
+                          }
+                          ready={
+                            dossier?.node.gid === chosen.gid &&
+                            dossier.analysis_id === analysis.analysis_id
+                          }
+                          period={{
+                            start: analysis.summary.period_start,
+                            end: analysis.summary.period_end,
+                          }}
+                          onConnect={() => setKeyDialogOpen(true)}
+                          onRemove={() => setApiKey("")}
+                          onFacts={() => setDetailTab("overview")}
+                        />
                       )}
                     </div>
                     <div className="dossier-footer">
@@ -1551,6 +1517,13 @@ export function App() {
           </footer>
         </main>
       </div>
+      <AssistantKeyDialog
+        open={keyDialogOpen}
+        connected={Boolean(apiKey)}
+        onClose={() => setKeyDialogOpen(false)}
+        onConnect={setApiKey}
+        onRemove={() => setApiKey("")}
+      />
       <dialog
         ref={helpDialog}
         className="modal-backdrop"
