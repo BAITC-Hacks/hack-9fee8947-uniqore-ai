@@ -2,11 +2,13 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { GraphEdge, GraphNode, roles, shortId } from "./types";
+import { applyFilterHighlight, graphScope } from "./graphScope";
 
 export interface GraphHandle {
   fit: () => void;
@@ -16,11 +18,13 @@ interface Props {
   nodes: GraphNode[];
   edges: GraphEdge[];
   selected: string;
+  selectedEdgeId?: string;
   onSelect: (gid: string) => void;
   onEdge: (edge: GraphEdge) => void;
   scope: "ego" | "all";
   hops: number;
   allowed: Set<string>;
+  highlightMatches?: boolean;
   direction: "both" | "in" | "out";
   colorBy: "role" | "cluster";
   days: [number, number];
@@ -35,7 +39,20 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
   } | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const instance = useRef<Core | null>(null);
-  const renderedScope = useRef(props.scope);
+  const fullNetwork = useMemo(
+    () => new Set(props.nodes.map((node) => node.gid)),
+    [props.nodes],
+  );
+  const nodeById = useMemo(
+    () => new Map(props.nodes.map((node) => [node.gid, node])),
+    [props.nodes],
+  );
+  const displayScope = props.highlightMatches ? "all" : props.scope;
+  const displayAllowed = props.highlightMatches ? fullNetwork : props.allowed;
+  const displaySelected = props.highlightMatches ? "" : props.selected;
+  const displayHops = props.highlightMatches ? 0 : props.hops;
+  const displayDirection = props.highlightMatches ? "both" : props.direction;
+  const renderedScope = useRef(displayScope);
   const saved = useRef(new Map<string, { x: number; y: number }>());
   const latest = useRef(props);
   latest.current = props;
@@ -87,11 +104,43 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
           style: {
             width: "data(width)",
             "line-color": "#d7dee7",
-            "target-arrow-color": "#c6d0dd",
+            "target-arrow-color": "#8c9fae",
             "target-arrow-shape": "triangle",
-            "arrow-scale": 0.95,
+            "arrow-scale": 1.25,
             "curve-style": "bezier",
             opacity: 0.75,
+          },
+        },
+        {
+          selector: "node.filter-muted",
+          style: { opacity: 0.32, "text-opacity": 0.25 },
+        },
+        {
+          selector: "node.filter-match",
+          style: { opacity: 1 },
+        },
+        {
+          selector: "node.filter-emphasis",
+          style: {
+            width: "data(highlightSize)",
+            height: "data(highlightSize)",
+            "border-width": "data(highlightBorderWidth)",
+            "underlay-color": "#00b5c8",
+            "underlay-opacity": 0.26,
+            "underlay-padding": "data(highlightPadding)",
+            "z-index": 10,
+          },
+        },
+        {
+          selector: "edge.filter-muted",
+          style: { opacity: 0.12 },
+        },
+        {
+          selector: "edge.filter-match-edge",
+          style: {
+            "line-color": "#61aeb4",
+            "target-arrow-color": "#367f88",
+            opacity: 0.8,
           },
         },
         { selector: "node:selected", style: { "overlay-opacity": 0 } },
@@ -115,6 +164,10 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
           },
         },
         {
+          selector: "node.boundary.filter-emphasis",
+          style: { "border-width": "data(highlightBorderWidth)" },
+        },
+        {
           selector: ".selected-edge",
           style: {
             "line-color": "#70b4bb",
@@ -122,7 +175,44 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
             opacity: 0.85,
           },
         },
+        {
+          selector: "node.filter-selected",
+          style: {
+            opacity: 1,
+            "text-opacity": 1,
+            width: "data(selectedSize)",
+            height: "data(selectedSize)",
+            "border-color": "#00313d",
+            "border-width": "data(selectedBorderWidth)",
+            "font-size": "data(selectedFontSize)",
+            "z-index": 30,
+          },
+        },
+        {
+          selector: "edge.selected-edge.filter-muted",
+          style: { opacity: 0.4 },
+        },
+        {
+          selector: ".inspected-edge",
+          style: {
+            "line-color": "#245f6a",
+            "target-arrow-color": "#245f6a",
+            "underlay-color": "#70b4bb",
+            "underlay-opacity": 0.2,
+            "underlay-padding": 4,
+            opacity: 1,
+          },
+        },
         { selector: ".inactive", style: { opacity: 0.12 } },
+        { selector: "edge.filter-muted.inactive", style: { opacity: 0.025 } },
+        {
+          selector: "edge.inspected-edge.filter-muted",
+          style: { opacity: 1 },
+        },
+        {
+          selector: "edge.inspected-edge.inactive",
+          style: { opacity: 0.55, "line-style": "dashed" },
+        },
         { selector: "node:active", style: { "overlay-opacity": 0 } },
       ] as cytoscape.StylesheetStyle[],
     });
@@ -149,9 +239,13 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     });
     cy.on("mouseout", "node", () => setHover(null));
     cy.on("pan zoom", () => setHover(null));
+    cy.on("zoom", () => {
+      if (latest.current.highlightMatches)
+        applyFilterHighlight(cy, latest.current.allowed, true);
+    });
     cy.on("dragfree", "node", (event) =>
       saved.current.set(
-        `${latest.current.scope}:${event.target.id()}`,
+        `${latest.current.highlightMatches ? "all" : latest.current.scope}:${event.target.id()}`,
         event.target.position(),
       ),
     );
@@ -164,7 +258,8 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       if (width !== previousWidth || height !== previousHeight) {
         previousWidth = width;
         previousHeight = height;
-        if (cy.elements().length) cy.fit(cy.elements(), 45);
+        if (cy.elements().length && !latest.current.highlightMatches)
+          cy.fit(cy.elements(), 45);
       }
     });
     observer.observe(container.current);
@@ -177,25 +272,16 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
   useEffect(() => {
     const cy = instance.current;
     if (!cy) return;
-    const adjacency = new Map<string, Set<string>>();
-    props.edges.forEach((e) => {
-      if (!adjacency.has(e.src)) adjacency.set(e.src, new Set());
-      if (!adjacency.has(e.dst)) adjacency.set(e.dst, new Set());
-      if (props.direction !== "in") adjacency.get(e.src)!.add(e.dst);
-      if (props.direction !== "out") adjacency.get(e.dst)!.add(e.src);
-    });
-    let visible = new Set<string>(
-      props.scope === "all" ? props.allowed : [props.selected],
+    const view = graphScope(
+      props.edges,
+      displayAllowed,
+      displaySelected,
+      displayScope,
+      displayHops,
+      displayDirection,
+      props.highlightMatches ? fullNetwork : undefined,
     );
-    if (props.scope === "ego")
-      for (let hop = 0; hop < props.hops; hop++) {
-        const next = new Set(visible);
-        visible.forEach((gid) =>
-          adjacency.get(gid)?.forEach((n) => next.add(n)),
-        );
-        visible = next;
-      }
-    visible = new Set([...visible].filter((gid) => props.allowed.has(gid)));
+    const visible = view.nodes;
     const shown = props.nodes.filter((n) => visible.has(n.gid));
     const clusterIds = [...new Set(shown.map((n) => n.cluster_id))].sort(
       (a, b) => a - b,
@@ -213,7 +299,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       const initial = {
         x:
           (Math.cos(centerAngle) * centerRadius + Math.cos(angle) * radius) *
-          (props.scope === "all" ? 1.7 : 1),
+          (displayScope === "all" ? 1.7 : 1),
         y: Math.sin(centerAngle) * centerRadius + Math.sin(angle) * radius,
       };
       const color =
@@ -236,39 +322,37 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
               ? 46
               : Math.min(35, 17 + Math.sqrt(n.in_degree + n.out_degree) * 2.1),
         },
-        position: saved.current.get(`${props.scope}:${n.gid}`) || initial,
+        position: saved.current.get(`${displayScope}:${n.gid}`) || initial,
         classes: [
           n.gid === props.selected ? "chosen" : "",
           n.boundary ? "boundary" : "",
         ].join(" "),
       };
     });
-    props.edges
-      .filter((e) => visible.has(e.src) && visible.has(e.dst))
-      .forEach((e) => {
-        const active = e.daily.some((d) => {
-          const day = Number(d.date.slice(-2));
-          return day >= props.days[0] && day <= props.days[1];
-        });
-        elements.push({
-          data: {
-            id: e.id,
-            source: e.src,
-            target: e.dst,
-            width: Math.min(3, 0.7 + Math.log10(1 + e.amount) / 5),
-          },
-          classes: [
-            e.src === props.selected || e.dst === props.selected
-              ? "selected-edge"
-              : "",
-            active ? "" : "inactive",
-          ].join(" "),
-        });
+    view.edges.forEach((e) => {
+      const active = e.daily.some((d) => {
+        const day = Number(d.date.slice(-2));
+        return day >= props.days[0] && day <= props.days[1];
       });
+      elements.push({
+        data: {
+          id: e.id,
+          source: e.src,
+          target: e.dst,
+          width: Math.min(3, 0.7 + Math.log10(1 + e.amount) / 5),
+        },
+        classes: [
+          e.src === props.selected || e.dst === props.selected
+            ? "selected-edge"
+            : "",
+          active ? "" : "inactive",
+        ].join(" "),
+      });
+    });
     cy.nodes().forEach((n) => {
       saved.current.set(`${renderedScope.current}:${n.id()}`, n.position());
     });
-    renderedScope.current = props.scope;
+    renderedScope.current = displayScope;
     cy.batch(() => {
       cy.elements().remove();
       cy.add(elements);
@@ -276,7 +360,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     if (
       shown.length > 1 &&
       shown.length < 180 &&
-      shown.some((n) => !saved.current.has(`${props.scope}:${n.gid}`))
+      shown.some((n) => !saved.current.has(`${displayScope}:${n.gid}`))
     ) {
       cy.layout({
         name: "cose",
@@ -296,10 +380,10 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       }));
       cy.fit(cy.elements(), 45);
       cy.nodes().forEach((n) => {
-        saved.current.set(`${props.scope}:${n.id()}`, n.position());
+        saved.current.set(`${displayScope}:${n.id()}`, n.position());
       });
     } else cy.fit(cy.elements(), 55);
-    if (shown.length < 180 && shown.length) {
+    if (!props.highlightMatches && shown.length < 180 && shown.length) {
       const zoom = cy.zoom();
       cy.batch(() => {
         cy.nodes().forEach((n) => {
@@ -318,6 +402,75 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     }
     props.onCount(shown.length);
   }, [
+    props.nodes,
+    props.edges,
+    displaySelected,
+    displayScope,
+    displayHops,
+    displayAllowed,
+    props.colorBy,
+    displayDirection,
+    props.highlightMatches,
+    fullNetwork,
+  ]);
+  useEffect(() => {
+    const cy = instance.current;
+    if (!cy) return;
+    // Selection and filters only update classes in full-network highlighting mode.
+    const nodeCount = cy.nodes().length;
+    cy.batch(() => {
+      cy.nodes().forEach((node) => {
+        const selected = node.id() === props.selected;
+        node.toggleClass("chosen", selected);
+        const source = nodeById.get(node.id());
+        if (source) {
+          node.data(
+            "size",
+            selected
+              ? 46
+              : Math.min(
+                  35,
+                  17 + Math.sqrt(source.in_degree + source.out_degree) * 2.1,
+                ),
+          );
+          node.data(
+            "label",
+            selected || nodeCount < 16 || (nodeCount < 100 && source.rank <= 10)
+              ? shortId(source.gid)
+              : "",
+          );
+        }
+      });
+      cy.edges().forEach((edge) => {
+        edge.toggleClass(
+          "selected-edge",
+          edge.source().id() === props.selected ||
+            edge.target().id() === props.selected,
+        );
+      });
+    });
+    applyFilterHighlight(cy, props.allowed, Boolean(props.highlightMatches));
+  }, [
+    props.allowed,
+    props.highlightMatches,
+    props.selected,
+    props.nodes,
+    props.edges,
+    props.scope,
+    props.hops,
+    props.direction,
+    props.colorBy,
+    nodeById,
+  ]);
+  useEffect(() => {
+    const cy = instance.current;
+    if (!cy) return;
+    cy.elements(".inspected-edge").removeClass("inspected-edge");
+    if (props.selectedEdgeId)
+      cy.getElementById(props.selectedEdgeId).addClass("inspected-edge");
+  }, [
+    props.selectedEdgeId,
+    props.highlightMatches,
     props.nodes,
     props.edges,
     props.selected,

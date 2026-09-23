@@ -48,8 +48,20 @@ def create_app(result: dict, out: Path) -> FastAPI:
 
     @app.get("/api/analysis")
     def analysis():
+        manifest = result["manifest"]
+        verification = manifest.get("verification", {})
+        status = verification.get("status", "unverified")
+        if status not in {"passed", "failed", "unverified"}:
+            status = "unverified"
+        hashes = manifest.get("input_sha256", {})
+        dataset = {"files": [{"name": name, **({"sha256": hashes[name]} if name in hashes else {})}
+                             for name in ("nodes.parquet", "edges.parquet", "transactions.parquet")],
+                   "verification": {"status": status}}
+        for source, target in [("full_run_seconds", "full_run_seconds"), ("elapsed_seconds", "calculation_seconds")]:
+            if source in manifest:
+                dataset[target] = manifest[source]
         return {**{k: result[k] for k in ["analysis_id", "algorithm_version", "summary", "edges", "clusters", "daily"]},
-                "nodes": graph_nodes,
+                "nodes": graph_nodes, "dataset": dataset,
                 "elapsed_seconds": result["manifest"]["elapsed_seconds"],
                 "assistant_available": bool(os.getenv("LLM_BASE_URL") and os.getenv("LLM_MODEL") and os.getenv("LLM_API_KEY"))}
 

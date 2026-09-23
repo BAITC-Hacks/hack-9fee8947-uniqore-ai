@@ -18,7 +18,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-ALGORITHM_VERSION = "1.0.0"
+from .clusters import CLUSTER_THRESHOLDS, explain_cluster
+
+ALGORITHM_VERSION = "1.1.0"
 ROLES = {
     "coordinator": "Координатор",
     "consolidator": "Консолидатор",
@@ -359,7 +361,14 @@ def analyze(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame, input_ha
             "priority_factors": {"volume": round(.35 * row.q_flow, 6), "bridge": round(.25 * row.q_betweenness, 6),
                                  "seed_reach": round(.25 * row.q_seed_reach, 6), "activity": round(.15 * row.q_n_tx, 6)},
         }
-        nr["why"] = f"Поток {money(int(row.flow) / 100)}; достижимость от {int(row.seed_reach)} seed; {int(row.n_tx)} участий в переводах."
+        contributions = nr["priority_factors"]
+        nr["why"] = (
+            f"Объём {money(int(row.flow) / 100)}: +{contributions['volume'] * 100:.2f} балла; "
+            f"посредничество на кратчайших маршрутах ({row.betweenness:.6g}): +{contributions['bridge'] * 100:.2f}; "
+            f"достижимость от {int(row.seed_reach)} seed: +{contributions['seed_reach'] * 100:.2f}; "
+            f"активность {int(row.n_tx)} участий в переводах: +{contributions['activity'] * 100:.2f}. "
+            f"Итого {nr['priority_score'] * 100:.2f}/100; вклады округлены."
+        )
         node_rows.append(nr)
     ordered = sorted(node_rows, key=lambda n: (-n["priority_score"], int(n["gid"])))
     for rank, nr in enumerate(ordered, 1):
@@ -370,13 +379,12 @@ def analyze(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame, input_ha
         members = sorted((node_index[str(g)] for g in group), key=lambda n: n["rank"])
         internal = sum(a["cents"] for s, d, a in G.edges(data=True) if membership[s] == i == membership[d])
         roles = Counter(n["role"] for n in members)
-        dominant = roles.most_common(1)[0][0]
         n_seed = sum(n["is_seed"] for n in members)
-        hypothesis = ("Изолированный seed: связей 0, данных о структуре недостаточно." if len(group) == 1 and not G.degree(next(iter(group)))
-                      else f"Сообщество из {len(group)} узлов, seed: {n_seed}. Преобладающая наблюдаемая роль: {ROLES[dominant].lower()}; внутренний оборот {money(internal / 100)}.")
+        explanation = explain_cluster(G, group, node_index)
+        hypothesis = " ".join([explanation["purpose"] + ".", *explanation["evidence"], *explanation["limitations"]])
         cluster_rows.append({"cluster_id": i, "n_nodes": len(group), "n_seed": n_seed,
                              "sum_kzt_internal": internal / 100, "top_gids": [n["gid"] for n in members[:5]],
-                             "hypothesis": hypothesis, "roles": dict(roles)})
+                             "hypothesis": hypothesis, "roles": dict(roles), "explanation": explanation})
     edge_days = {}
     for (src, dst, day), group in tx.groupby(["src", "dst", "date"], sort=True):
         edge_days.setdefault((int(src), int(dst)), []).append({
@@ -399,7 +407,8 @@ def analyze(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame, input_ha
         "analysis_id": analysis_id, "algorithm_version": ALGORITHM_VERSION, "input_sha256": input_hashes or {},
         "parameters": {"louvain_seed": 42, "resolution": 1, "in_degree_threshold": threshold_in,
                        "out_degree_threshold": threshold_out, "coordinator_betweenness_threshold": None if math.isinf(threshold_b) else threshold_b,
-                       "transit_ratio": [.8, 1.2], "temporal_lag_days": [1, 2], "priority_weights": [.35, .25, .25, .15]},
+                       "transit_ratio": [.8, 1.2], "temporal_lag_days": [1, 2], "priority_weights": [.35, .25, .25, .15],
+                       "cluster_hypothesis_thresholds": dict(CLUSTER_THRESHOLDS)},
         "environment": {"python": platform.python_version(), "platform": platform.platform(),
                         "packages": {p: version(p) for p in ["pandas", "numpy", "networkx", "pyarrow"]}},
     }

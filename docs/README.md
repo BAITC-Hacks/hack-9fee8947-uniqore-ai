@@ -8,8 +8,10 @@
 - [Условия и неизменённые источники](finance/README.md).
 - [Согласованный архитектурный план](finance/architecture.md).
 - [Фактическая реализация и контракты](finance/implementation.md).
-- [Локальная проверка и review по критериям](finance/validation.md).
+- [Исходная проверка первой версии](finance/validation.md).
+- [Проверка сквозного демо и текущие ограничения](finance/demo-ux-validation.md).
 - [Деплой на NVIDIA Brev: Docker Compose и инструкция](deployment/brev.md).
+- [Подсветка и фильтры клиентов: последующая проверка](finance/demo-filter-validation.md).
 - [Сценарий демонстрации](finance/demo.md).
 - [Agentic SDD pipeline: план разработки через Codex и Claude Code](agentic-sdd-pipeline/README.md).
 - [Ветки, локальная приёмка и PR](development-workflow.md).

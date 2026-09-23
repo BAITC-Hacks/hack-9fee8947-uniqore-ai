@@ -89,6 +89,17 @@ export interface Cluster {
   top_gids: string[];
   hypothesis: string;
   roles: Record<string, number>;
+  explanation?: {
+    purpose: string;
+    evidence: string[];
+    limitations: string[];
+    incoming_amount: number;
+    outgoing_amount: number;
+    kind: "collection" | "distribution" | "transit" | "mixed" | "undetermined";
+    rule: string;
+    metrics: Record<string, number>;
+    thresholds: Record<string, number>;
+  };
 }
 export interface Transaction {
   src: string;
@@ -100,6 +111,12 @@ export interface Transaction {
 export interface Analysis {
   analysis_id: string;
   algorithm_version: string;
+  dataset?: {
+    files: { name: string; sha256?: string }[];
+    verification: { status: "passed" | "failed" | "unverified" };
+    full_run_seconds?: number;
+    calculation_seconds?: number;
+  };
   nodes: GraphNode[];
   edges: GraphEdge[];
   clusters: Cluster[];
