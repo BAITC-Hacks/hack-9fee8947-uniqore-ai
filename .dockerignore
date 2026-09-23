@@ -1,0 +1,10 @@
+# Only runtime code, the bundled frontend, locked dependencies and case data.
+**
+!Dockerfile
+!requirements.lock
+!moneygraph/
+!moneygraph/**
+!data/
+!data/*.parquet
+moneygraph/**/__pycache__/
+moneygraph/**/*.pyc
