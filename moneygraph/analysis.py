@@ -43,7 +43,7 @@ def sha256(path: Path) -> str:
 
 
 def json_write(path: Path, value: dict) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def as_cents(series: pd.Series) -> pd.Series:
@@ -434,11 +434,11 @@ def load_and_analyze(data: Path) -> dict:
 def write_outputs(result: dict, out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     nodes = sorted(result["nodes"], key=lambda n: int(n["gid"]))
-    pd.DataFrame(nodes)[ROLE_COLUMNS].to_csv(out / OUTPUTS[0], index=False, float_format="%.6f")
+    pd.DataFrame(nodes)[ROLE_COLUMNS].to_csv(out / OUTPUTS[0], index=False, float_format="%.6f", encoding="utf-8", lineterminator="\n")
     clusters = [{**c, "top_gids": ";".join(c["top_gids"])} for c in result["clusters"]]
-    pd.DataFrame(clusters, columns=CLUSTER_COLUMNS).to_csv(out / OUTPUTS[1], index=False, float_format="%.2f")
+    pd.DataFrame(clusters, columns=CLUSTER_COLUMNS).to_csv(out / OUTPUTS[1], index=False, float_format="%.2f", encoding="utf-8", lineterminator="\n")
     top = sorted(nodes, key=lambda n: n["rank"])[:20]
-    pd.DataFrame(top)[TOP_COLUMNS].to_csv(out / OUTPUTS[2], index=False, float_format="%.6f")
+    pd.DataFrame(top)[TOP_COLUMNS].to_csv(out / OUTPUTS[2], index=False, float_format="%.6f", encoding="utf-8", lineterminator="\n")
     result["manifest"]["output_sha256"] = {name: sha256(out / name) for name in OUTPUTS}
     json_write(out / "manifest.json", result["manifest"])
     json_write(out / "analysis.json", result)
@@ -474,7 +474,7 @@ def verify_outputs(data: Path, out: Path) -> dict:
     aligned = roles.set_index("gid").loc[top.gid]
     if aligned.role.tolist() != top.role.tolist() or not np.allclose(aligned.priority_score, top.priority_score, atol=1e-7):
         raise DataError("Роли/приоритеты top расходятся с nodes_roles.")
-    manifest = json.loads((out / "manifest.json").read_text())
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     for name, digest in manifest["input_sha256"].items():
         if sha256(data / name) != digest:
             raise DataError("Входные файлы изменились после расчёта.")
