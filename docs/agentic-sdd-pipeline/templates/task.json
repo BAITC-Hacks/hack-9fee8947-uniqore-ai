@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "task_id": "T-001",
   "feature_id": "REPLACE_FEATURE_ID",
-  "spec_version": "1",
+  "baseline_ref": {"spec_version": "1", "artifacts_commit": null, "spec_sha256": null, "contract_versions": {}},
   "requirement_ids": ["R-001"],
   "acceptance_ids": ["AC-001"],
   "contract_ids": [],
@@ -17,5 +17,6 @@
   "reviewer": {"agent_id": null, "tool": null, "human_owner": null},
   "checks": [],
   "limits": {"max_repair_attempts": 2, "repair_minutes": 15, "deadline_at": null},
-  "status": "DRAFT"
+  "status": "DRAFT",
+  "reason_code": null
 }

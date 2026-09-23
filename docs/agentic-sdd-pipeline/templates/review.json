@@ -3,7 +3,7 @@
   "task_id": "T-001",
   "reviewed_commit": null,
   "base_commit": null,
-  "spec_version": "1",
+  "baseline_ref": {"spec_version": "1", "artifacts_commit": null, "spec_sha256": null, "contract_versions": {}},
   "reviewer": null,
   "independence": null,
   "check_results": [],

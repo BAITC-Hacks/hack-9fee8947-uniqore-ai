@@ -48,9 +48,9 @@ single integration queue -> verify candidate -> human handoff
 
 | ID | Компонент | Поведение | Зависимости | Приёмка |
 |---|---|---|---|---|
-| AUTO-01 | Validator | Схемы JSON, refs, DAG, ownership, версии, запрещённые пути | templates + процесс v1 | PA-01..04 |
-| AUTO-02 | Ledger | Один writer, event seq, atomic persist, lease, resume | AUTO-01 | PA-09/12 |
-| AUTO-03 | Git workspace adapter | Изолированный worktree, base/dependency check, scope diff | AUTO-01 | PA-05/08/15/16 |
+| AUTO-01 | Validator | Схемы JSON, refs, DAG, ownership, версии, запрещённые пути | templates + процесс v1 | PA-01..04/21/24 |
+| AUTO-02 | Ledger | Один writer, control branch, event seq, atomic persist, lease, resume | AUTO-01 | PA-09/12/20/22 |
+| AUTO-03 | Git workspace adapter | Изолированный worktree, base/dependency check, scope diff, merge ancestry | AUTO-01 | PA-05/08/15/16/23 |
 | AUTO-04 | Agent adapter | Интерактивная передача либо проверенный headless CLI | реальный tool preflight | PA-13/14/18 |
 | AUTO-05 | Check/review gate | argv без shell, timeout, exit/SHA, reviewer independence | AUTO-02..04 | PA-06/07/09/19 |
 | AUTO-06 | Integration/handoff | Последовательный candidate, actual tests, authorization gate | AUTO-05 | PA-10/11/17 |
@@ -107,7 +107,7 @@ Shared contracts и зависимости имеют одного writer; UI/а
 |---|---:|---|---|
 | CEO | 1 | Reviewed, revised | 3 findings: общий бюджет, топология, gate для runner; исправлены |
 | Design | 0 | Skipped | Пользовательский UI не создаётся; Markdown/CLI рассматривает DX |
-| Engineering | 0 | Pending | После CEO |
-| DX | 0 | Pending | После Engineering |
+| Engineering | 1 | Reviewed, revised | 4 findings: evidence SHA, baseline, state recovery, merge ancestry; исправлены |
+| DX | 1 | Reviewed, revised | 4 findings: bootstrap, prompts, collections, input/run lifecycle; исправлены |
 
-VERDICT: Draft for review. Отчёт будет обновлён по завершении проверок. Ни код runner, ни продуктовые задачи не реализованы.
+VERDICT: REVIEWED DRAFT — последовательные CEO/Engineering/DX review завершены, 11 замечаний внесены в план. Режим subagent-only: внешний CLI недоступен, dual-voice consensus не заявлен. Пользовательское принятие процесса и реальный пилот ещё впереди. Ни код runner, ни продуктовые задачи не реализованы. Подробности, scorecards и решения — в [review.md](review.md).
