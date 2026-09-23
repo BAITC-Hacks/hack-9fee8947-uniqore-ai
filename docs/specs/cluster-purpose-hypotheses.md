@@ -32,4 +32,3 @@
 - [Требования к кластерам](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/blob/9b1b2ddf1cb04a2238b3b2d730ff9dbf1847d84f/docs/finance/requirements.md)
 
 Реализация — отдельная ветка от актуальной main, локальная проверка, PR в main; слияние после подтверждения локальной приёмки проверенного commit.
-
