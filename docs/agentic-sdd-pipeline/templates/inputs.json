@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "feature_id": "REPLACE_FEATURE_ID",
+  "status": "WAITING_INPUT",
+  "product_plan": {"owner": "Роман", "path": null, "git_commit": null, "sha256": null},
+  "source_refs": [],
+  "constraints": {"team_size": 2, "hackathon_hours": 5, "coding_tools": ["Codex", "Claude Code"]},
+  "topology": "same_host",
+  "coordinator_owner": null,
+  "integrator_owner": null,
+  "approved_by": null,
+  "approved_at": null
+}

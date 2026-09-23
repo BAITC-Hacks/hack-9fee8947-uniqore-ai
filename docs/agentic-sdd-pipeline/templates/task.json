@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "task_id": "T-001",
+  "feature_id": "REPLACE_FEATURE_ID",
+  "spec_version": "1",
+  "requirement_ids": ["R-001"],
+  "acceptance_ids": ["AC-001"],
+  "contract_ids": [],
+  "goal": "REPLACE_WITH_VERIFIABLE_OUTCOME",
+  "non_goals": [],
+  "depends_on": [],
+  "dependency_commits": {},
+  "base_commit": null,
+  "allowed_files": [],
+  "forbidden_files": [],
+  "worker": {"agent_id": null, "tool": null, "human_owner": null},
+  "reviewer": {"agent_id": null, "tool": null, "human_owner": null},
+  "checks": [],
+  "limits": {"max_repair_attempts": 2, "repair_minutes": 15, "deadline_at": null},
+  "status": "DRAFT"
+}

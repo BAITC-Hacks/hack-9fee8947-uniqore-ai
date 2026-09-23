@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "task_id": "T-001",
+  "reviewed_commit": null,
+  "base_commit": null,
+  "spec_version": "1",
+  "reviewer": null,
+  "independence": null,
+  "check_results": [],
+  "findings": [],
+  "verdict": "blocked",
+  "reason": "Template only; no review has been performed"
+}
