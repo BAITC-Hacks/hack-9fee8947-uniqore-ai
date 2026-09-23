@@ -142,15 +142,17 @@ python scripts/smoke_local_launch.py --data data --out out/readme-check --port 8
 
 | Среда и версия | Реально выполнено | Доказательство |
 |---|---|---|
+| Linux amd64, чистый контейнер `python:3.12-slim-bookworm`, Python 3.12.14, commit `6620aa1` | Команды README «macOS / Linux» на свежем клоне: venv, установка lock, `pip check`, preflight, `demo`, API, 3 CSV, Ctrl+C, `verify` для `out` и `results`, 89 тестов, smoke `pass`. Новый процесс `run`: **7,36 с** | [Проверка на чистой машине](docs/clean-machine-check.md) |
+| Docker, Linux amd64, свежий клон `78590c9` (код и конфигурация как в `6620aa1`) | Сборка `--no-cache --pull`, `healthy`, API, 3 CSV, `verify`, браузер, 89 тестов в образе без сети | [Проверка на чистой машине](docs/clean-machine-check.md) |
 | macOS arm64, Python 3.12.1, Node 25.8.1, commit `a91e3de` | 89 backend-тестов, 8 тестов графа, build, браузерная проверка текущего frontend; свежий smoke CLI/API/CSV/assets и остановка сервера прошли | [Текущая проверка и машинный отчёт](docs/finance/demo-filter-validation.md) |
 | Windows 11 x64, Python 3.12.14, commit `60276af` | 71 тест; preflight и `pip check`; CLI/API, 3 CSV, все assets, браузер, Ctrl+C и занятый порт. Новый процесс `run`: **6,7669 с**; весь smoke: **20,1606 с** | [Отчёт с SHA, командами и ограничениями](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/blob/834ecaf921e1c4551a33c80d7781cf1c6746acc5/docs/sdd/local-launch/reviews/T-004.md) |
 | Windows 11 x64, Python 3.14.5, commit `bb0c5d0` | Новый venv, установка lock, preflight, `pip check`, 14 тестов окружения. Полный smoke под 3.14 этим прогоном не подтверждён | [Отчёт Python 3.14](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/blob/834ecaf921e1c4551a33c80d7781cf1c6746acc5/docs/sdd/local-launch/evidence/bb0c5d0/python314.json) |
 | macOS arm64, Python 3.12.1, исходная версия анализа | Новый процесс: **27,0019 с**, пиковая память **197,16 MiB**; отдельный повтор **7,59 с** | [Исходное измерение](results/benchmark.json), [повтор](results/repeat-benchmark.json), [контекст версии](docs/finance/validation.md) |
 | Docker, Linux amd64, версия конфигурации Brev | Сборка, запуск, API, CSV, браузер, перезапуск и 29 тестов той версии | [Отчёт и проверенный commit](docs/deployment/brev.md#проверка-конфигурации) |
 
-Измерения `run` включают новый Python-процесс, импорты, анализ, запись CSV и verify; установка исключена, кэш ОС не очищался. Это результаты отдельных машин, не сравнение производительности платформ. Память на Windows не измерялась. Таблица фиксирует конкретные исторические версии; Windows/Linux не перепроверены для нового UX. Текущие изменения и проверки приведены в [отчёте подсветки и фильтров](docs/finance/demo-filter-validation.md).
+Измерения `run` включают новый Python-процесс, импорты, анализ, запись CSV и verify; установка исключена, кэш ОС не очищался. Это результаты отдельных машин, не сравнение производительности платформ. Память на Windows не измерялась. Таблица фиксирует конкретные исторические версии; Windows не перепроверен для нового UX, Linux и Docker проверены на текущей версии. Текущие изменения и проверки приведены в [отчёте подсветки и фильтров](docs/finance/demo-filter-validation.md).
 
-Техническая проверка Windows выполнена агентами. Повторение инструкции вторым участником и подтверждение локальной приёмки остаются открыты по [спецификации](docs/specs/local-launch.md). Прямой Python-запуск на Linux, реальный Brev-инстанс и живой внешний LLM в этой проверке не испытывались.
+Техническая проверка Windows выполнена агентами. Повторение инструкции вторым участником и подтверждение локальной приёмки остаются открыты по [спецификации](docs/specs/local-launch.md). Реальный Brev-инстанс и живой внешний LLM не испытывались.
 
 ## Как получается результат
 
