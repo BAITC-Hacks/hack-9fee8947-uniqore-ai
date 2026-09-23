@@ -1,0 +1,47 @@
+{
+  "analysis_id": "ad6239d9995448b0",
+  "algorithm_version": "1.0.0",
+  "input_sha256": {
+    "nodes.parquet": "d2a45b0df6e9352832d5fb09839d10b9e23f898156c3bab263b051b31cc0296d",
+    "edges.parquet": "4e71dde5cd3115bcb26e91202665532ee6581cf8233a9fc8059ea59fb7358a38",
+    "transactions.parquet": "c30c5317b5439591dde86f2058dc47a3d19b2900c055ded994fe547f6fb7e7da"
+  },
+  "parameters": {
+    "louvain_seed": 42,
+    "resolution": 1,
+    "in_degree_threshold": 3,
+    "out_degree_threshold": 10,
+    "coordinator_betweenness_threshold": 0.00048324374418048634,
+    "transit_ratio": [
+      0.8,
+      1.2
+    ],
+    "temporal_lag_days": [
+      1,
+      2
+    ],
+    "priority_weights": [
+      0.35,
+      0.25,
+      0.25,
+      0.15
+    ]
+  },
+  "environment": {
+    "python": "3.12.1",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "packages": {
+      "pandas": "2.3.3",
+      "numpy": "2.5.3",
+      "networkx": "3.7",
+      "pyarrow": "24.0.0"
+    }
+  },
+  "elapsed_seconds": 8.115,
+  "output_sha256": {
+    "nodes_roles.csv": "482f5a94003c9ac811db932c3931600327c0cf5636a2f8c3eed382a2afe82297",
+    "clusters.csv": "7661365bd216b0ca4c0bc92fcccd51c367e3fcbf855114c1d9cc604850632e0e",
+    "top_nodes.csv": "83f53890172357deacf9fc46af03bc920c0170df2a9dca3b30364cf6e618260e"
+  },
+  "full_run_seconds": 8.2655
+}
