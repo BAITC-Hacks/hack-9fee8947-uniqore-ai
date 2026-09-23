@@ -29,13 +29,29 @@
 
 Нужен **Python 3.12**. Node не нужен для просмотра: готовая сборка React включена в репозиторий. Команды выполнять из его корня. Первичная установка библиотек требует доступа к PyPI; дальнейший основной сценарий — без сети.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.lock
+**Windows, PowerShell:**
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.lock
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe scripts/check_environment.py --profile runtime
+.\.venv\Scripts\python.exe -m moneygraph demo --data data --out out
 ```
 
-После установки один запуск от исходных Parquet до CSV и интерфейса:
+Активация окружения и изменение `ExecutionPolicy` не нужны. Если `py -3.12` не найден, нужен установленный Python 3.12: [выбор интерпретатора, проверка и ошибки запуска](docs/local-launch.md).
+
+**macOS / Linux:**
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.lock
+python -m pip check
+python scripts/check_environment.py --profile runtime
+```
+
+После установки один запуск от исходных Parquet до CSV и интерфейса (в PowerShell он уже указан последней строкой выше):
 
 ```bash
 python -m moneygraph demo --data data --out out
@@ -43,7 +59,7 @@ python -m moneygraph demo --data data --out out
 
 Открыть **[http://127.0.0.1:8765](http://127.0.0.1:8765)**. Остановить сервер — `Ctrl+C`. Если порт занят, добавить `--port 8766`. Сервер по умолчанию слушает только локальный адрес. Внешней deployed-версии сейчас нет.
 
-Только пересчёт или проверка сохранённых результатов:
+Только пересчёт или проверка сохранённых результатов; в PowerShell замените `python` на `.\.venv\Scripts\python.exe`:
 
 ```bash
 python -m moneygraph run --data data --out out
@@ -54,7 +70,7 @@ python -m pytest -q
 
 Проверенные артефакты доступны сразу: [роли всех узлов](results/nodes_roles.csv), [сообщества](results/clusters.csv), [топ-20](results/top_nodes.csv), [manifest с параметрами и SHA-256](results/manifest.json). Приложение каждый раз пересчитывает входные файлы, а не читает эти примеры вместо аналитики.
 
-Проверка установки выполнена в отдельном виртуальном окружении и копии проекта. Windows/Linux в этой итерации не проверялись. В Windows активация окружения отличается: `.venv\Scripts\activate`.
+Историческая проверка установки выполнена на macOS в отдельном виртуальном окружении и копии проекта. Локальная приёмка Windows выполняется отдельно по [спецификации запуска](docs/specs/local-launch.md); Linux не проверялся. Preflight проверяет окружение, данные и файлы интерфейса, но сам анализ не запускает.
 
 ## Сценарий аналитика за минуту
 
