@@ -1,6 +1,6 @@
 # Bundled vendor shaders contain intentional trailing spaces inside string literals.
 moneygraph/web/assets/** linguist-generated=true -whitespace
 
-# Reference checksums are calculated over the canonical LF bytes on every OS.
-results/*.csv text eol=lf
+# Hashed outputs keep their exact bytes: Windows autocrlf would break the SHA-256 checks in results/manifest.json.
+results/*.csv -text
 results/*.json text eol=lf

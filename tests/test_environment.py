@@ -11,7 +11,7 @@ MODULE_SPEC.loader.exec_module(environment)
 
 
 def test_python_target_and_venv_are_actionable(monkeypatch):
-    monkeypatch.setattr(environment.sys, "version_info", (3, 14, 5))
+    monkeypatch.setattr(environment.sys, "version_info", (3, 11, 9))
     monkeypatch.setattr(environment.sys, "prefix", "same")
     monkeypatch.setattr(environment.sys, "base_prefix", "same")
     issues = environment.check_python()
@@ -19,8 +19,9 @@ def test_python_target_and_venv_are_actionable(monkeypatch):
     assert any("VENV_REQUIRED" in issue and "-m venv" in issue for issue in issues)
 
 
-def test_system_site_packages_are_rejected(tmp_path, monkeypatch):
-    monkeypatch.setattr(environment.sys, "version_info", (3, 12, 14))
+@pytest.mark.parametrize("version", [(3, 12, 14), (3, 13, 0), (3, 14, 5)])
+def test_system_site_packages_are_rejected(tmp_path, monkeypatch, version):
+    monkeypatch.setattr(environment.sys, "version_info", version)
     monkeypatch.setattr(environment.sys, "prefix", str(tmp_path))
     monkeypatch.setattr(environment.sys, "base_prefix", "base")
     (tmp_path / "pyvenv.cfg").write_text("include-system-site-packages = true\n", encoding="utf-8")

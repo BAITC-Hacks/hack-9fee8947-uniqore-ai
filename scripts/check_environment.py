@@ -35,11 +35,11 @@ class AssetParser(HTMLParser):
 
 def check_python() -> list[str]:
     issues = []
-    if sys.version_info[:2] != (3, 12):
+    if sys.version_info[:2] < (3, 12):
         version = ".".join(map(str, sys.version_info[:3]))
-        issues.append(f"PYTHON_VERSION: found {version}; the verified target is Python 3.12. Create a fresh venv with Python 3.12.")
+        issues.append(f"PYTHON_VERSION: found {version}; Python 3.12 or newer is required. Create a fresh venv with a supported Python.")
     if sys.prefix == sys.base_prefix:
-        issues.append("VENV_REQUIRED: use an isolated venv. Create it with Python 3.12 -m venv .venv and invoke its Python directly.")
+        issues.append("VENV_REQUIRED: use an isolated venv. Create it with Python 3.12+ -m venv .venv and invoke its Python directly.")
     else:
         config = Path(sys.prefix) / "pyvenv.cfg"
         try:
@@ -166,7 +166,7 @@ def check_frontend(web: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Check the Python 3.12 local runtime; no Node or API keys required.")
+    parser = argparse.ArgumentParser(description="Check the Python 3.12+ local runtime; no Node or API keys required.")
     parser.add_argument("--profile", choices=("runtime",), default="runtime")
     parser.parse_args(argv)
     issues = check_python() + check_dependencies(ROOT) + check_inputs(ROOT / "data") + check_frontend(ROOT / "moneygraph" / "web")
@@ -175,7 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     if issues:
         print(f"Runtime preflight failed: {len(issues)} issue(s). Follow the actions above and rerun this command.")
         return 1
-    print("PASS Python 3.12 isolated venv, locked dependencies/imports, 3 Parquet inputs and bundled frontend assets.")
+    version = ".".join(map(str, sys.version_info[:3]))
+    print(f"PASS Python {version} isolated venv, locked dependencies/imports, 3 Parquet inputs and bundled frontend assets.")
     print("Runtime is ready for python -m moneygraph demo --data data --out out; analysis has not been executed.")
     return 0
 

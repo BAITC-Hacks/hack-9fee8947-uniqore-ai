@@ -1,6 +1,6 @@
 # Локальный запуск Tyuin в Windows
 
-Статус: **в реализации и локальной проверке**. Источник текущей реализации — `main`, baseline `18c412d4d90daa161456bc7ebacc23e4874cd26e`. Документ задаёт условия приёмки; не является отчётом об успешном запуске.
+Статус: **в реализации и локальной проверке**. Источник текущей реализации — `main`, baseline `0b5e0ba7af1bba8fa8a1ed5dec5e9bdcc2c587b9`. Документ задаёт условия приёмки; не является отчётом об успешном запуске.
 
 Как участник команды или проверяющий, я хочу запустить Tyuin на Windows по README, чтобы получить расчёт, три CSV и интерфейс без ручной сборки frontend и обязательного AI-аккаунта.
 
@@ -10,7 +10,7 @@
 
 Архитектура запуска: `data/*.parquet → moneygraph demo → расчёт + CSV/manifest → FastAPI 127.0.0.1 → moneygraph/web`. Node нужен разработке frontend, но не установленному runtime. Установка Python-зависимостей может требовать PyPI; основной сценарий после неё работает без внешнего AI.
 
-Подробная декомпозиция и контракты — в [зафиксированной SDD-спецификации v2](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/blob/0f74000f920cdbcad886ba91a69b0c9eac9076eb/docs/sdd/local-launch/spec.md); состояние выполнения и результаты ведутся в [ветке codex/local-launch](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/tree/codex/local-launch/docs/sdd/local-launch). Новая база `18c412d` сохраняет согласованный объём, а приведённый ниже контракт учитывает актуальные правила проекта.
+Подробная декомпозиция и контракты — в [зафиксированной SDD-спецификации v2](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/blob/0f74000f920cdbcad886ba91a69b0c9eac9076eb/docs/sdd/local-launch/spec.md); состояние выполнения и результаты ведутся в [ветке codex/local-launch](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/tree/codex/local-launch/docs/sdd/local-launch). Новая база `0b5e0ba` сохраняет согласованный объём, а приведённый ниже контракт учитывает актуальные правила проекта. Python 3.12 остаётся средой этой приёмки; приложение и preflight сохраняют принятый в main диапазон Python 3.12+ и поддержку 3.14. Правило `results/*.csv -text` из main сохраняется: checkout не преобразует канонические bytes.
 
 ## Задачи
 
