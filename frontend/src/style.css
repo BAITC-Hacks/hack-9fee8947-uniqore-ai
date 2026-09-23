@@ -10,7 +10,11 @@
   font-synthesis: none;
   font-weight: 400;
   font-size: 13px;
-  --blue: #3675dd;
+  --accent: #006b75;
+  --accent-light: #e8f6f5;
+  --accent-border: #b7dedf;
+  --petrol: #00313d;
+  --turquoise: #00b5c8;
   --line: #e8edf3;
   --muted: #8390a2;
   --navy: #253b58;
@@ -54,7 +58,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 2px solid #4788eb;
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 a {
@@ -109,14 +113,16 @@ button:hover:not(:disabled) {
   z-index: 20;
 }
 .brand-symbol {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
-  background: #3276dd;
-  color: white;
-  box-shadow: 0 5px 12px #3478de26;
+  border-radius: 12px;
+}
+.brand-symbol img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 .rail-middle {
   display: flex;
@@ -137,8 +143,8 @@ button:hover:not(:disabled) {
   background: #f2f6fc;
 }
 .rail-button.active {
-  color: var(--blue);
-  background: #edf4ff;
+  color: var(--accent);
+  background: var(--accent-light);
 }
 .rail-monogram {
   display: grid;
@@ -148,7 +154,7 @@ button:hover:not(:disabled) {
   padding-top: 17px;
   font-size: 17px;
   font-weight: 750;
-  color: #778aa3;
+  color: var(--petrol);
 }
 .app-body {
   margin-left: 68px;
@@ -164,14 +170,18 @@ button:hover:not(:disabled) {
   background: #fff;
 }
 .wordmark {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -1.3px;
-  color: #24364e;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 6px;
 }
-.wordmark span {
-  color: #7b8fa9;
-  font-weight: 450;
+.wordmark img {
+  display: block;
+  width: auto;
+  height: calc(100% - 12px);
+  max-height: 62px;
+  object-fit: contain;
 }
 .header-divider {
   width: 1px;
@@ -222,21 +232,21 @@ button:hover:not(:disabled) {
 }
 .icon-button:hover {
   background: #f0f4fb;
-  color: #4079cf;
+  color: var(--accent);
 }
 .primary {
   display: inline-flex;
   gap: 9px;
   align-items: center;
   justify-content: center;
-  background: var(--blue);
+  background: var(--accent);
   color: white;
-  border: 1px solid #2868d0;
+  border: 1px solid #005b65;
   border-radius: 7px;
   padding: 10px 14px;
   font-size: 12px;
   font-weight: 550;
-  box-shadow: 0 2px 4px #2c6dc51a;
+  box-shadow: 0 2px 4px #006b751a;
 }
 .export-wrap {
   position: relative;
@@ -311,7 +321,7 @@ main {
   color: #243953;
 }
 .intro h1 > span {
-  color: var(--blue);
+  color: var(--accent);
 }
 .intro p {
   font-size: 12px;
@@ -378,8 +388,8 @@ main {
   margin-top: 4px;
 }
 .blue {
-  color: #5285d7;
-  background: #edf3fd;
+  color: var(--accent);
+  background: var(--accent-light);
 }
 .teal {
   color: #51a69e;
@@ -475,14 +485,14 @@ main {
   right: 0;
   content: "";
   height: 2px;
-  background: var(--blue);
+  background: var(--accent);
 }
 .queue-tabs span {
   font-size: 9px;
   border-radius: 4px;
-  background: #eaf1fc;
+  background: var(--accent-light);
   padding: 3px 5px;
-  color: #658ccb;
+  color: var(--accent);
   margin-left: 3px;
 }
 .queue-tools {
@@ -515,8 +525,8 @@ main {
   color: #98a6b8;
 }
 .search-box:focus-within {
-  border-color: #94b6eb;
-  box-shadow: 0 0 0 2px #edf3fc;
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-light);
 }
 .search-box button {
   padding: 0;
@@ -530,9 +540,9 @@ main {
   flex-shrink: 0;
 }
 .filter-button.applied {
-  background: #eaf1fe;
-  border-color: #c1d5f4;
-  color: #3278db;
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 .filters {
   padding: 0 15px 12px;
@@ -563,12 +573,12 @@ main {
   gap: 4px;
 }
 .filter-bottom input {
-  accent-color: var(--blue);
+  accent-color: var(--accent);
   margin: 0;
 }
 .filter-bottom button {
   font-size: 10px;
-  color: #4e82c8;
+  color: var(--accent);
   padding: 4px;
 }
 .list-caption {
@@ -605,8 +615,8 @@ main {
   background: #f7f9fc;
 }
 .queue-item.selected {
-  border-color: #dfeafa;
-  background: #eff5ff;
+  border-color: var(--accent-border);
+  background: var(--accent-light);
 }
 .queue-item.selected:before {
   content: "";
@@ -615,7 +625,7 @@ main {
   top: 12px;
   bottom: 12px;
   width: 3px;
-  background: #4b87e4;
+  background: var(--turquoise);
   border-radius: 3px;
 }
 .rank {
@@ -626,7 +636,7 @@ main {
   font-variant-numeric: tabular-nums;
 }
 .queue-item.selected .rank {
-  color: #6597df;
+  color: var(--accent);
 }
 .queue-node {
   flex: 1;
@@ -690,7 +700,7 @@ main {
   left: 0;
   bottom: 0;
   height: 3px;
-  background: #91b5e7;
+  background: #69aeb4;
   border-radius: 3px;
   z-index: 1;
 }
@@ -708,7 +718,7 @@ main {
 .load-more {
   width: 100%;
   padding: 15px;
-  color: #5e8ec9;
+  color: var(--accent);
   font-size: 11px;
 }
 .empty-list {
@@ -720,7 +730,7 @@ main {
 }
 .empty-list button {
   font-size: 10px;
-  color: #5082c6;
+  color: var(--accent);
   margin-top: 10px;
 }
 .cluster-item {
@@ -823,9 +833,9 @@ main {
   background: white;
 }
 .graph-pills .active {
-  background: #eef4fd;
-  border-color: #dfe9f8;
-  color: #5c86bc;
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 .color-select {
   font-size: 9px;
@@ -958,7 +968,7 @@ main {
 }
 .canvas-empty button {
   font-size: 11px;
-  color: #4f84d1;
+  color: var(--accent);
 }
 .timeline {
   height: 153px;
@@ -987,7 +997,7 @@ main {
 }
 .timeline-heading button {
   font-size: 8px;
-  color: #6292d2;
+  color: var(--accent);
   padding: 0;
 }
 .bars {
@@ -1012,14 +1022,14 @@ main {
   width: 50%;
   border-radius: 2px 2px 0 0;
   min-height: 0;
-  background: #9cbeec;
+  background: #7ebec2;
   transition: opacity 0.2s;
 }
 .day-bar b {
   background: #bfd8d9;
 }
 .day-bar:hover {
-  background: #edf3fd;
+  background: var(--accent-light);
 }
 .day-bar.muted i,
 .day-bar.muted b {
@@ -1035,7 +1045,7 @@ main {
   width: 50%;
   height: 12px;
   margin: 0;
-  accent-color: #6d98d4;
+  accent-color: var(--accent);
   cursor: ew-resize;
 }
 .timeline-foot {
@@ -1057,7 +1067,7 @@ main {
   width: 4px;
   height: 4px;
   display: inline-block;
-  background: #92b6e7;
+  background: #69aeb4;
   border-radius: 1px;
 }
 .out-dot {
@@ -1144,7 +1154,7 @@ main {
   font-size: 19px;
   font-weight: 550;
   letter-spacing: -0.5px;
-  color: #507bac;
+  color: var(--accent);
 }
 .priority-box strong small {
   font-size: 10px;
@@ -1163,7 +1173,7 @@ main {
 .priority-track i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #bad1ef, #6095db);
+  background: linear-gradient(90deg, #a2d5d5, #368b94);
   border-radius: 3px;
 }
 .support {
@@ -1202,7 +1212,7 @@ main {
   gap: 3px;
 }
 .detail-tabs .active {
-  color: #527fbb;
+  color: var(--accent);
   font-weight: 550;
 }
 .detail-tabs .active:after {
@@ -1212,7 +1222,7 @@ main {
   bottom: -1px;
   left: 0;
   right: 0;
-  background: #5d8ed2;
+  background: var(--accent);
 }
 .dossier-scroll {
   padding: 18px 20px;
@@ -1232,7 +1242,7 @@ main {
 }
 .section-label button {
   font-size: 9px;
-  color: #6191d1;
+  color: var(--accent);
   letter-spacing: 0;
   display: flex;
   gap: 3px;
@@ -1653,13 +1663,19 @@ main {
   align-items: center;
   justify-content: center;
   gap: 20px;
-  background: #f8faff;
-  color: #85a0c1;
+  background: #f7faf9;
+  color: var(--accent);
+  padding: 24px;
+  text-align: center;
+}
+.startup-logo {
+  width: min(380px, 85vw);
+  height: auto;
 }
 .startup h1 {
-  color: #395474;
+  color: var(--petrol);
   font-weight: 500;
-  font-size: 26px;
+  font-size: 20px;
 }
 .startup p {
   font-size: 12px;
@@ -2005,9 +2021,6 @@ main {
   }
   .product-name {
     font-size: 12px;
-  }
-  .wordmark {
-    font-size: 21px;
   }
   .page-footer {
     flex-wrap: wrap;
@@ -2428,7 +2441,7 @@ main {
 .priority-factor b {
   height: 3px;
   display: block;
-  background: #9ebee6;
+  background: #69aeb4;
 }
 .priority-factor strong {
   font-weight: 500;
@@ -2453,9 +2466,9 @@ main {
   height: 9px;
   border-radius: 50%;
   margin-top: -3px;
-  background: #6f99d1;
+  background: var(--accent);
   border: 2px solid #fff;
-  box-shadow: 0 0 0 1px #8db0df;
+  box-shadow: 0 0 0 1px #69aeb4;
 }
 .range-inputs input::-moz-range-track {
   height: 3px;
@@ -2465,7 +2478,7 @@ main {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #6f99d1;
+  background: var(--accent);
   border: 2px solid #fff;
 }
 .graph-legend .seed-dot {
