@@ -7,6 +7,7 @@
 - [Фактическая реализация и контракты](finance/implementation.md).
 - [Локальная проверка и review по критериям](finance/validation.md).
 - [Сценарий демонстрации](finance/demo.md).
+- [Agentic SDD pipeline: план разработки через Codex и Claude Code](agentic-sdd-pipeline/README.md).
 - [Ветки, локальная приёмка и PR](development-workflow.md).
 
 Первичные документы, проектный план и отчёт о работающей версии обозначены отдельно.

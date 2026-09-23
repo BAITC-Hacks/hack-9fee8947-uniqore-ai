@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "check_id": "CHECK-001",
+  "checked_commit": null,
+  "baseline_ref": {"spec_version": "1", "artifacts_commit": null, "spec_sha256": null, "contract_versions": {}},
+  "argv": [],
+  "cwd": ".",
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "result": "not_run",
+  "summary": "Template only; no check has been run",
+  "log_path": null,
+  "executor": null,
+  "verifier_mode": null,
+  "context": {}
+}

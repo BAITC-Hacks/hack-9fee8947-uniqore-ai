@@ -13,3 +13,9 @@ node_modules/
 dist/
 build/
 *.log
+
+# Local browser state, credentials and superseded working drafts
+.gstack/
+
+# SDD runtime state is local; canonical specs and evidence stay versioned
+.sdd/runtime/
