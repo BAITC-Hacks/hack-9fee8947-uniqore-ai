@@ -1,2 +1,5 @@
 # Bundled vendor shaders contain intentional trailing spaces inside string literals.
 moneygraph/web/assets/** linguist-generated=true -whitespace
+
+# Hashed outputs keep their exact bytes: Windows autocrlf would break the SHA-256 checks in results/manifest.json.
+results/*.csv -text
