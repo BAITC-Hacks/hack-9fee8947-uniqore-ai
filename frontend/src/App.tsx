@@ -594,27 +594,29 @@ function Workbench({
             <button className="secondary upload-button" onClick={onUpload}>
               <FileUp size={16} /> Загрузить данные
             </button>
-            <button
-              className={`assistant-key-control ${apiKey ? "connected" : ""}`}
-              onClick={() => setKeyDialogOpen(true)}
-              title={
-                apiKey
-                  ? "OpenAI: ключ задан в этой вкладке. Управление ключом"
-                  : "Подключить OpenAI"
-              }
-            >
-              <KeyRound size={15} />
-              <span>{apiKey ? "OpenAI · ключ задан" : "Подключить AI"}</span>
-            </button>
-            <button
-              className="help-button"
-              aria-label="Справка и данные"
-              title="Справка и данные"
-              onClick={() => setHelp(true)}
-            >
-              <CircleHelp size={18} />
-              <span>Справка и данные</span>
-            </button>
+            <div className="header-tools">
+              <button
+                className={`assistant-key-control ${apiKey ? "connected" : ""}`}
+                onClick={() => setKeyDialogOpen(true)}
+                title={
+                  apiKey
+                    ? "OpenAI: ключ задан в этой вкладке. Управление ключом"
+                    : "Подключить OpenAI"
+                }
+              >
+                <KeyRound size={15} />
+                <span>{apiKey ? "OpenAI · ключ задан" : "Подключить AI"}</span>
+              </button>
+              <button
+                className="help-button"
+                aria-label="Справка и данные"
+                title="Справка и данные"
+                onClick={() => setHelp(true)}
+              >
+                <CircleHelp size={18} />
+                <span>Справка и данные</span>
+              </button>
+            </div>
             <div className="export-wrap">
               <button
                 className="primary export-button"
