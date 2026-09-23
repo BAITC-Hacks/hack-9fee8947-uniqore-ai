@@ -18,11 +18,14 @@ def test_shared_snapshot_and_all_exports(client, analysis, outputs):
     graph = client.get("/api/analysis").json()
     assert graph["analysis_id"] == analysis["analysis_id"]
     assert graph["assistant_available"] is False
+    assert all("role_explanation" not in n for n in graph["nodes"])
     for n in [min(analysis["nodes"], key=lambda n: n["rank"]), next(n for n in analysis["nodes"] if n["isolated"]), next(n for n in analysis["nodes"] if n["boundary"])]:
         response = client.get(f'/api/nodes/{n["gid"]}')
         assert response.status_code == 200
         dossier = response.json()
         assert dossier["node"] == n and dossier["analysis_id"] == graph["analysis_id"]
+        assert dossier["node"]["role_explanation"]["score"]["value"] == n["role_score"]
+        assert all("role_explanation" not in neighbor for neighbor in dossier["neighbors"])
         assert sum(t["amount"] for t in dossier["transactions"] if t["dst"] == n["gid"]) == pytest.approx(n["in_amount"])
     for filename in ("nodes_roles.csv", "clusters.csv", "top_nodes.csv"):
         response = client.get(f"/api/exports/{filename}")

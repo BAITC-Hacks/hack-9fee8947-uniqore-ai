@@ -6,11 +6,47 @@ export type Role =
   | "terminal"
   | "peripheral"
   | "unknown";
+export interface RoleCriterion {
+  key: string;
+  label: string;
+  observed: number | boolean | null;
+  operator: "gte" | "eq" | "between";
+  threshold: number | boolean | [number, number] | null;
+  passed: boolean;
+}
+export interface RoleExplanationData {
+  status: "hypothesis" | "insufficient_data";
+  criteria: RoleCriterion[];
+  selection: string;
+  rule_order: Role[];
+  excluded_rules: {
+    role: Role;
+    label: string;
+    unmet_criteria: RoleCriterion[];
+  }[];
+  threshold_method: string;
+  score: {
+    kind: "heuristic_support";
+    value: number;
+    formula: string;
+    cap: number | null;
+    factors: {
+      key: string;
+      label: string;
+      value: number;
+      weight: number | null;
+    }[];
+    rank_method: string;
+    interpretation: string;
+  };
+  limitations: string[];
+}
 export interface GraphNode {
   gid: string;
   role: Role;
   role_label: string;
   role_score: number;
+  role_explanation?: RoleExplanationData;
   priority_score: number;
   cluster_id: number;
   depth: number;

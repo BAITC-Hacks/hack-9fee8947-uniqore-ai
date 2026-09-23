@@ -13,22 +13,20 @@ import {
   Expand,
   FileText,
   Filter,
-  Focus,
   GitBranch,
   Layers,
   LoaderCircle,
-  Network,
   Plus,
   Search,
   ShieldCheck,
   Sparkles,
-  Users,
   X,
   Minus,
   AlertTriangle,
   CornerDownRight,
 } from "lucide-react";
 import { Graph, GraphHandle } from "./Graph";
+import { RoleExplanation } from "./RoleExplanation";
 import {
   Analysis,
   Dossier,
@@ -55,7 +53,7 @@ function RoleBadge({ node }: { node: GraphNode }) {
       style={{ color: role.color, background: role.tint }}
     >
       <i style={{ background: role.color }} />
-      {role.label}
+      {node.role === "unknown" ? role.label : `Гипотеза: ${role.label}`}
     </span>
   );
 }
@@ -72,7 +70,6 @@ export function App() {
   const [seedOnly, setSeedOnly] = useState(false);
   const [depthFilter, setDepthFilter] = useState("all");
   const [direction, setDirection] = useState<"both" | "in" | "out">("both");
-  const [showFilters, setShowFilters] = useState(false);
   const [leftTab, setLeftTab] = useState<"queue" | "clusters">("queue");
   const [scope, setScope] = useState<"ego" | "all">("ego");
   const [hops, setHops] = useState(1);
@@ -94,6 +91,23 @@ export function App() {
   const [explaining, setExplaining] = useState(false);
   const [rowLimit, setRowLimit] = useState(50);
   const graph = useRef<GraphHandle>(null);
+  const helpDialog = useRef<HTMLDialogElement>(null);
+  const dossierScroll = useRef<HTMLDivElement>(null);
+  const queueList = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dossierScroll.current?.scrollTo(0, 0);
+  }, [selected, detailTab]);
+
+  useEffect(() => {
+    setRowLimit(50);
+    queueList.current?.scrollTo(0, 0);
+  }, [roleFilter, clusterFilter, depthFilter, seedOnly, query, leftTab]);
+
+  useEffect(() => {
+    if (help) helpDialog.current?.showModal();
+    else helpDialog.current?.close();
+  }, [help]);
   const explanationRequest = useRef<AbortController | null>(null);
   const pendingEdge = useRef<GraphEdge | null>(null);
 
@@ -162,13 +176,24 @@ export function App() {
         .sort((a, b) => a.rank - b.rank),
     [analysis, allowed, query],
   );
-  const top = useMemo(
-    () =>
-      (analysis?.nodes || [])
-        .filter((n) => n.rank <= 20)
-        .sort((a, b) => a.rank - b.rank),
-    [analysis],
-  );
+  const filteredClusters = useMemo(() => {
+    const members = new Map<number, GraphNode[]>();
+    for (const node of analysis?.nodes || []) {
+      if (!allowed.has(node.gid)) continue;
+      const group = members.get(node.cluster_id) || [];
+      group.push(node);
+      members.set(node.cluster_id, group);
+    }
+    return (analysis?.clusters || [])
+      .map((cluster) => ({
+        ...cluster,
+        members: (members.get(cluster.cluster_id) || []).sort(
+          (a, b) => a.rank - b.rank,
+        ),
+      }))
+      .filter((cluster) => cluster.members.length > 0)
+      .sort((a, b) => b.members.length - a.members.length);
+  }, [analysis, allowed]);
   const cluster = analysis?.clusters.find(
     (c) => c.cluster_id === chosen?.cluster_id,
   );
@@ -189,6 +214,7 @@ export function App() {
     setClusterFilter("all");
     setSeedOnly(false);
     setDepthFilter("all");
+    setRowLimit(50);
   };
   const choose = (gid: string) => {
     setSelected(gid);
@@ -232,10 +258,14 @@ export function App() {
   if (!analysis)
     return (
       <div className="startup">
-        <div className="brand-symbol">
-          <Network size={29} />
-        </div>
-        <h1>Граф денег</h1>
+        <img
+          className="startup-logo"
+          src="/tyuin-logo.png"
+          alt="Tyuin — рысь-сыщик"
+          width="1793"
+          height="877"
+        />
+        <h1>Финансовые связи становятся понятными</h1>
         {error ? (
           <>
             <p>{error}</p>
@@ -254,58 +284,27 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <aside className="rail">
-        <div className="brand-symbol">
-          <GitBranch size={25} />
-        </div>
-        <div className="rail-middle">
-          <button
-            className={
-              leftTab === "queue" ? "rail-button active" : "rail-button"
-            }
-            title="Очередь и граф"
-            onClick={() => setLeftTab("queue")}
-          >
-            <Network size={21} />
-          </button>
-          <button
-            className={
-              leftTab === "clusters" ? "rail-button active" : "rail-button"
-            }
-            title="Сообщества"
-            onClick={() => setLeftTab("clusters")}
-          >
-            <Layers size={21} />
-          </button>
-        </div>
-        <button
-          className="rail-button"
-          title="Метод и ограничения"
-          onClick={() => setHelp(true)}
-        >
-          <CircleHelp size={21} />
-        </button>
-        <span className="rail-monogram">U.</span>
-      </aside>
       <div className="app-body">
         <header className="topbar">
-          <a className="wordmark" href="/">
-            uniqore<span>.ai</span>
+          <a className="wordmark" href="/" aria-label="Tyuin — главная">
+            <img src="/tyuin-logo.png" alt="Tyuin" width="1793" height="877" />
           </a>
           <span className="header-divider" />
-          <span className="product-name">Граф денег</span>
-          <span className="workspace-pill">Рабочее пространство аналитика</span>
+          <span className="product-name">Финансовые связи</span>
+          <span className="workspace-period">Июль 2026</span>
           <div className="header-right">
             <span className="local-status">
               <i />
               Локальный анализ
             </span>
             <button
-              className="icon-button"
-              title="О методе"
+              className="help-button"
+              aria-label="Справка и данные"
+              title="Справка и данные"
               onClick={() => setHelp(true)}
             >
               <CircleHelp size={18} />
+              <span>Справка и данные</span>
             </button>
             <div className="export-wrap">
               <button
@@ -343,107 +342,86 @@ export function App() {
           </div>
         </header>
         <main>
-          <section className="intro">
-            <div>
-              <div className="eyebrow">
-                <span className="case-dot" />
-                ФИНАНСОВЫЙ МОНИТОРИНГ<span className="slash">/</span>ДЕЛО
-                07–2026
-              </div>
-              <h1>
-                За переводами — связи<span>.</span>
-              </h1>
-              <p>
-                Наблюдаемая структура сети. Обоснованные приоритеты для
-                проверки.
-              </p>
-            </div>
-            <div className="period-card">
-              <span className="period-icon">
-                <Activity size={19} />
-              </span>
-              <div>
-                <small>ПЕРИОД НАБЛЮДЕНИЯ</small>
-                <strong>01 — 31 июля 2026</strong>
-              </div>
-              <span className="period-tag">31 день</span>
-            </div>
-          </section>
-          <section className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-icon blue">
-                <Users size={19} />
-              </span>
-              <div>
-                <span>Клиенты в графе</span>
-                <strong>{number(analysis.summary.n_nodes)}</strong>
-              </div>
-              <small>{number(analysis.summary.n_edges)} связей</small>
-            </div>
-            <div className="stat-card">
-              <span className="stat-icon teal">
-                <ArrowUpRight size={20} />
-              </span>
-              <div>
-                <span>Объём переводов</span>
-                <strong>
-                  {amount(analysis.summary.total_amount)} <em>₸</em>
-                </strong>
-              </div>
-              <small>{number(analysis.summary.n_transactions)} операций</small>
-            </div>
-            <div className="stat-card">
-              <span className="stat-icon violet">
-                <Focus size={19} />
-              </span>
-              <div>
-                <span>Исходные клиенты</span>
-                <strong>
-                  {analysis.summary.n_seeds}
-                  <em>seed</em>
-                </strong>
-              </div>
-              <small>4 колена обхода</small>
-            </div>
+          <section
+            className="workspace-filters"
+            aria-label="Фильтры списка и графа"
+          >
+            <span className="filter-label">
+              <Filter size={16} />
+              Фильтры
+            </span>
+            <label>
+              Роль
+              <select
+                aria-label="Роль"
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+              >
+                <option value="all">Все роли</option>
+                {Object.entries(roles).map(([key, role]) => (
+                  <option key={key} value={key}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Сообщество
+              <select
+                aria-label="Сообщество"
+                value={clusterFilter}
+                onChange={(e) => setClusterFilter(e.target.value)}
+              >
+                <option value="all">Все сообщества</option>
+                {analysis.clusters.map((c) => (
+                  <option key={c.cluster_id} value={c.cluster_id}>
+                    Сообщество {String(c.cluster_id).padStart(2, "0")} ·{" "}
+                    {c.n_nodes}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Глубина
+              <select
+                aria-label="Глубина"
+                value={depthFilter}
+                onChange={(e) => setDepthFilter(e.target.value)}
+              >
+                <option value="all">Любая глубина</option>
+                {[0, 1, 2, 3, 4].map((d) => (
+                  <option key={d} value={d}>
+                    {d === 0
+                      ? "Seed · глубина 0"
+                      : d === 4
+                        ? "Граница · глубина 4"
+                        : `${d}-е колено`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="seed-filter">
+              <input
+                type="checkbox"
+                checked={seedOnly}
+                onChange={(e) => setSeedOnly(e.target.checked)}
+              />
+              Только seed
+            </label>
             <button
-              className="stat-card boundary-stat"
-              onClick={() => {
-                clearFilters();
-                setDepthFilter("4");
-                setLeftTab("queue");
-                setQuery("");
-                setShowFilters(true);
-              }}
+              className="reset-filters"
+              disabled={!hasFilters}
+              onClick={clearFilters}
             >
-              <span className="stat-icon amber">
-                <GitBranch size={19} />
-              </span>
-              <div>
-                <span>На границе наблюдения</span>
-                <strong>{analysis.summary.n_boundary}</strong>
-              </div>
-              <small>
-                Нужны данные дальше
-                <ArrowRight size={13} />
-              </small>
+              Сбросить фильтры
             </button>
+            <span className="filter-count" aria-live="polite">
+              {number(allowed.size)} из {number(analysis.summary.n_nodes)}{" "}
+              клиентов
+            </span>
           </section>
           <section className="investigation">
             <aside className="queue-panel">
-              <div className="queue-tabs">
-                <button
-                  className={leftTab === "queue" ? "active" : ""}
-                  onClick={() => setLeftTab("queue")}
-                >
-                  Приоритеты <span>{top.length}</span>
-                </button>
-                <button
-                  className={leftTab === "clusters" ? "active" : ""}
-                  onClick={() => setLeftTab("clusters")}
-                >
-                  Сообщества
-                </button>
-              </div>
               <div className="queue-tools">
                 <label className="search-box">
                   <Search size={15} />
@@ -453,10 +431,14 @@ export function App() {
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
+                      setLeftTab("queue");
                       setRowLimit(50);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && queue[0]) choose(queue[0].gid);
+                      if (e.key === "Enter" && queue[0]) {
+                        setLeftTab("queue");
+                        choose(queue[0].gid);
+                      }
                     }}
                   />
                   {query && (
@@ -465,81 +447,35 @@ export function App() {
                     </button>
                   )}
                 </label>
+              </div>
+              <div className="queue-tabs">
                 <button
-                  className={
-                    hasFilters ? "filter-button applied" : "filter-button"
-                  }
-                  title="Фильтры"
-                  onClick={() => setShowFilters(!showFilters)}
+                  className={leftTab === "queue" ? "active" : ""}
+                  onClick={() => setLeftTab("queue")}
                 >
-                  <Filter size={15} />
+                  Приоритеты
+                </button>
+                <button
+                  className={leftTab === "clusters" ? "active" : ""}
+                  onClick={() => {
+                    setLeftTab("clusters");
+                    setQuery("");
+                  }}
+                >
+                  Сообщества
                 </button>
               </div>
-              {showFilters && (
-                <div className="filters">
-                  <select
-                    aria-label="Роль"
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                  >
-                    <option value="all">Все роли</option>
-                    {Object.entries(roles).map(([key, r]) => (
-                      <option key={key} value={key}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Сообщество"
-                    value={clusterFilter}
-                    onChange={(e) => setClusterFilter(e.target.value)}
-                  >
-                    <option value="all">Все сообщества</option>
-                    {analysis.clusters.map((c) => (
-                      <option key={c.cluster_id} value={c.cluster_id}>
-                        Сообщество {String(c.cluster_id).padStart(2, "0")} ·{" "}
-                        {c.n_nodes}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Глубина"
-                    value={depthFilter}
-                    onChange={(e) => setDepthFilter(e.target.value)}
-                  >
-                    <option value="all">Любая глубина</option>
-                    {[0, 1, 2, 3, 4].map((d) => (
-                      <option key={d} value={d}>
-                        {d === 0
-                          ? "Seed · глубина 0"
-                          : d === 4
-                            ? "Граница · глубина 4"
-                            : `${d}-е колено`}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="filter-bottom">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={seedOnly}
-                        onChange={(e) => setSeedOnly(e.target.checked)}
-                      />
-                      Только seed
-                    </label>
-                    <button onClick={clearFilters}>Сбросить</button>
-                  </div>
-                </div>
-              )}
               <div className="list-caption">
                 <span>
                   {leftTab === "queue"
                     ? `${number(queue.length)} клиентов`
-                    : `${analysis.clusters.length} сообществ`}
+                    : `${filteredClusters.length} сообществ`}
                 </span>
-                <span>{leftTab === "queue" ? "ПРИОРИТЕТ" : "УЗЛЫ"}</span>
+                <span>
+                  {leftTab === "queue" ? "ПРИОРИТЕТ /100" : "В ВЫБОРКЕ"}
+                </span>
               </div>
-              <div className="queue-list">
+              <div className="queue-list" ref={queueList}>
                 {leftTab === "queue" ? (
                   <>
                     {queue.slice(0, rowLimit).map((n) => (
@@ -559,7 +495,9 @@ export function App() {
                           </strong>
                           <span className="queue-role">
                             <i style={{ background: roles[n.role].color }} />
-                            {roles[n.role].label}
+                            {n.role === "unknown"
+                              ? roles[n.role].label
+                              : `Гипотеза: ${roles[n.role].label}`}
                           </span>
                         </div>
                         <span className="queue-score">
@@ -592,40 +530,48 @@ export function App() {
                     )}
                   </>
                 ) : (
-                  analysis.clusters
-                    .slice()
-                    .sort((a, b) => b.n_nodes - a.n_nodes)
-                    .map((c) => (
-                      <button
-                        className={`cluster-item ${String(c.cluster_id) === clusterFilter ? "selected" : ""}`}
-                        key={c.cluster_id}
-                        onClick={() => {
-                          setClusterFilter(String(c.cluster_id));
-                          clearFilters();
-                          setClusterFilter(String(c.cluster_id));
-                          setScope("all");
-                          choose(c.top_gids[0]);
+                  filteredClusters.map((c) => (
+                    <button
+                      className={`cluster-item ${String(c.cluster_id) === clusterFilter ? "selected" : ""}`}
+                      key={c.cluster_id}
+                      onClick={() => {
+                        setClusterFilter(String(c.cluster_id));
+                        setScope("all");
+                        choose(c.members[0].gid);
+                      }}
+                    >
+                      <span
+                        className="cluster-glyph"
+                        style={{
+                          color: `hsl(${(c.cluster_id * 137.5) % 360},42%,50%)`,
                         }}
                       >
-                        <span
-                          className="cluster-glyph"
-                          style={{
-                            color: `hsl(${(c.cluster_id * 137.5) % 360},42%,50%)`,
-                          }}
-                        >
-                          <Layers size={18} />
-                        </span>
-                        <div>
-                          <strong>
-                            Сообщество {String(c.cluster_id).padStart(2, "0")}
-                          </strong>
-                          <small>
-                            {c.n_seed} seed · {amount(c.sum_kzt_internal)} ₸
-                          </small>
-                        </div>
-                        <span>{c.n_nodes}</span>
-                      </button>
-                    ))
+                        <Layers size={18} />
+                      </span>
+                      <div>
+                        <strong>
+                          Сообщество {String(c.cluster_id).padStart(2, "0")}
+                        </strong>
+                        <small>
+                          Всего: {c.n_seed} seed · {amount(c.sum_kzt_internal)}{" "}
+                          ₸
+                        </small>
+                      </div>
+                      <span title={`Всего в сообществе: ${c.n_nodes}`}>
+                        {c.members.length}
+                        {c.members.length !== c.n_nodes && (
+                          <small>из {c.n_nodes}</small>
+                        )}
+                      </span>
+                    </button>
+                  ))
+                )}
+                {leftTab === "clusters" && filteredClusters.length === 0 && (
+                  <div className="empty-list">
+                    Сообществ по этим фильтрам нет.
+                    <br />
+                    <button onClick={clearFilters}>Сбросить фильтры</button>
+                  </div>
                 )}
               </div>
               <div className="queue-footer">
@@ -730,11 +676,14 @@ export function App() {
                     </span>
                   </div>
                 )}
-                {selectedOutside && (
+                {selectedOutside && scope === "ego" && (
                   <div className="canvas-empty">
                     <Filter size={25} />
                     <strong>Выбранный клиент вне фильтра</strong>
-                    <button onClick={clearFilters}>Показать его связи</button>
+                    <button onClick={() => setScope("all")}>
+                      Показать выборку на графе
+                    </button>
+                    <button onClick={clearFilters}>Сбросить фильтры</button>
                   </div>
                 )}
                 <div className="canvas-controls">
@@ -893,6 +842,11 @@ export function App() {
                         {copied ? <Check size={16} /> : <Copy size={16} />}
                       </button>
                     </div>
+                    {selectedOutside && (
+                      <p className="outside-notice">
+                        Этот клиент вне текущей выборки
+                      </p>
+                    )}
                     <div className="dossier-tags">
                       <RoleBadge node={chosen} />
                       <span className="depth-pill">
@@ -914,13 +868,6 @@ export function App() {
                           style={{ width: `${pct(chosen.priority_score)}%` }}
                         />
                       </div>
-                      <span className="support">
-                        Поддержка гипотезы <b>{pct(chosen.role_score)}/100</b>
-                        <CircleHelp
-                          size={12}
-                          aria-label="Эвристический балл, не вероятность"
-                        />
-                      </span>
                     </div>
                   </div>
                   <div className="detail-tabs">
@@ -943,10 +890,17 @@ export function App() {
                       </button>
                     ))}
                   </div>
-                  <div className="dossier-scroll">
+                  <div className="dossier-scroll" ref={dossierScroll}>
                     {nodeError && <div className="error-box">{nodeError}</div>}
                     {detailTab === "overview" && (
                       <>
+                        <RoleExplanation
+                          node={
+                            dossier?.node.gid === chosen.gid
+                              ? dossier.node
+                              : chosen
+                          }
+                        />
                         <div className="section-label">ПОТОКИ ЗА ИЮЛЬ</div>
                         <div className="flow-grid">
                           <div>
@@ -970,14 +924,6 @@ export function App() {
                             <small>{chosen.out_degree} получателям</small>
                           </div>
                         </div>
-                        <div className="evidence-heading">
-                          <span className="section-label">ПОЧЕМУ ЭТА РОЛЬ</span>
-                          <span className="fact-tag">
-                            <Check size={11} />
-                            По данным
-                          </span>
-                        </div>
-                        <p className="evidence-text">{chosen.evidence}</p>
                         <div className="fact-row">
                           <span>Достижимость от seed</span>
                           <strong>{chosen.seed_reach}</strong>
@@ -1027,6 +973,7 @@ export function App() {
                           className="community-link"
                           onClick={() => {
                             setLeftTab("clusters");
+                            setQuery("");
                             clearFilters();
                             setClusterFilter(String(chosen.cluster_id));
                             setScope("all");
@@ -1210,72 +1157,118 @@ export function App() {
           </footer>
         </main>
       </div>
-      {help && (
-        <div className="modal-backdrop" onClick={() => setHelp(false)}>
-          <section
-            className="method-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Метод и ограничения"
-            onClick={(e) => e.stopPropagation()}
+      <dialog
+        ref={helpDialog}
+        className="modal-backdrop"
+        aria-labelledby="help-title"
+        onCancel={() => setHelp(false)}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setHelp(false);
+        }}
+      >
+        <section className="method-modal" onClick={(e) => e.stopPropagation()}>
+          <button
+            className="modal-close icon-button"
+            title="Закрыть"
+            onClick={() => setHelp(false)}
           >
-            <button
-              className="modal-close icon-button"
-              title="Закрыть"
-              onClick={() => setHelp(false)}
-            >
-              <X size={20} />
-            </button>
-            <div className="eyebrow">ПРОЗРАЧНАЯ АНАЛИТИКА</div>
-            <h2>Что показывает граф</h2>
-            <p>
-              Роли описывают структуру наблюдаемых переводов. Приоритет помогает
-              выбрать следующего клиента для проверки, а поддержка гипотезы
-              показывает силу рассчитанных признаков.
-            </p>
-            <div className="method-grid">
-              {Object.entries(roles).map(([key, r]) => (
-                <div key={key}>
-                  <i style={{ background: r.color }} />
-                  <strong>{r.label}</strong>
-                  <span>{analysis.summary.roles[key] || 0} узлов</span>
-                </div>
-              ))}
+            <X size={20} />
+          </button>
+          <div className="eyebrow">ПРОЗРАЧНАЯ АНАЛИТИКА</div>
+          <h2 id="help-title">Справка и данные</h2>
+          <p>Наблюдаемая сеть переводов за 1–31 июля 2026 года.</p>
+          <dl className="dataset-summary">
+            <div>
+              <dt>Клиенты</dt>
+              <dd>
+                {number(analysis.summary.n_nodes)}
+                <small>{number(analysis.summary.n_edges)} связей</small>
+              </dd>
             </div>
-            <h3>Границы результата</h3>
-            <ul>
-              <li>
-                Граф построен от {analysis.summary.n_seeds} seed по исходящим
-                переводам на четыре колена.
-              </li>
-              <li>
-                {analysis.summary.n_boundary} узла на границе: отсутствие выхода
-                не означает, что деньги остались.
-              </li>
-              <li>
-                {analysis.summary.n_isolated} изолированных клиентов сохранены в
-                анализе.
-              </li>
-              <li>
-                Только июль 2026, один банк, суммы от 5 000 ₸. Полные балансы
-                неизвестны.
-              </li>
-              <li>
-                Роли рассчитаны правилами; эталонной разметки для оценки
-                accuracy нет.
-              </li>
-            </ul>
-            <p className="micro-note">
-              Seed обозначены ромбом, граница — пунктирным контуром. Цвет узла
-              соответствует роли или сообществу.
-            </p>
-            <button className="primary" onClick={() => setHelp(false)}>
-              К исследованию сети
-              <ArrowRight size={16} />
-            </button>
-          </section>
-        </div>
-      )}
+            <div>
+              <dt>Объём переводов</dt>
+              <dd>
+                {amount(analysis.summary.total_amount)} ₸
+                <small>
+                  {number(analysis.summary.n_transactions)} операций
+                </small>
+              </dd>
+            </div>
+            <div>
+              <dt>Исходные клиенты</dt>
+              <dd>
+                {analysis.summary.n_seeds} seed<small>4 колена обхода</small>
+              </dd>
+            </div>
+            <div>
+              <dt>На границе наблюдения</dt>
+              <dd>
+                {analysis.summary.n_boundary}
+                <small>
+                  <button
+                    onClick={() => {
+                      clearFilters();
+                      setDepthFilter("4");
+                      setScope("all");
+                      setLeftTab("queue");
+                      setQuery("");
+                      setHelp(false);
+                    }}
+                  >
+                    Показать клиентов →
+                  </button>
+                </small>
+              </dd>
+            </div>
+          </dl>
+          <h3>Как читать результат</h3>
+          <p>
+            Роли описывают структуру наблюдаемых переводов. Приоритет помогает
+            выбрать следующего клиента для проверки, а поддержка гипотезы
+            показывает силу рассчитанных признаков.
+          </p>
+          <div className="method-grid">
+            {Object.entries(roles).map(([key, r]) => (
+              <div key={key}>
+                <i style={{ background: r.color }} />
+                <strong>{r.label}</strong>
+                <span>{analysis.summary.roles[key] || 0} узлов</span>
+              </div>
+            ))}
+          </div>
+          <h3>Границы результата</h3>
+          <ul>
+            <li>
+              Граф построен от {analysis.summary.n_seeds} seed по исходящим
+              переводам на четыре колена.
+            </li>
+            <li>
+              {analysis.summary.n_boundary} узла на границе: отсутствие выхода
+              не означает, что деньги остались.
+            </li>
+            <li>
+              {analysis.summary.n_isolated} изолированных клиентов сохранены в
+              анализе.
+            </li>
+            <li>
+              Только июль 2026, один банк, суммы от 5 000 ₸. Полные балансы
+              неизвестны.
+            </li>
+            <li>
+              Роли рассчитаны правилами; эталонной разметки для оценки accuracy
+              нет.
+            </li>
+          </ul>
+          <p className="micro-note">
+            Seed обозначены ромбом, граница — пунктирным контуром. Цвет узла
+            соответствует роли или сообществу.
+          </p>
+          <button className="primary" onClick={() => setHelp(false)}>
+            К исследованию сети
+            <ArrowRight size={16} />
+          </button>
+        </section>
+      </dialog>
     </div>
   );
 }
