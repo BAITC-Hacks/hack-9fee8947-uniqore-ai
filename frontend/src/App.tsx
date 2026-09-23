@@ -594,27 +594,29 @@ function Workbench({
             <button className="secondary upload-button" onClick={onUpload}>
               <FileUp size={16} /> Загрузить данные
             </button>
-            <button
-              className={`assistant-key-control ${apiKey ? "connected" : ""}`}
-              onClick={() => setKeyDialogOpen(true)}
-              title={
-                apiKey
-                  ? "OpenAI: ключ задан в этой вкладке. Управление ключом"
-                  : "Подключить OpenAI"
-              }
-            >
-              <KeyRound size={15} />
-              <span>{apiKey ? "OpenAI · ключ задан" : "Подключить AI"}</span>
-            </button>
-            <button
-              className="help-button"
-              aria-label="Справка и данные"
-              title="Справка и данные"
-              onClick={() => setHelp(true)}
-            >
-              <CircleHelp size={18} />
-              <span>Справка и данные</span>
-            </button>
+            <div className="header-tools">
+              <button
+                className={`assistant-key-control ${apiKey ? "connected" : ""}`}
+                onClick={() => setKeyDialogOpen(true)}
+                title={
+                  apiKey
+                    ? "OpenAI: ключ задан в этой вкладке. Управление ключом"
+                    : "Подключить OpenAI"
+                }
+              >
+                <KeyRound size={15} />
+                <span>{apiKey ? "OpenAI · ключ задан" : "Подключить AI"}</span>
+              </button>
+              <button
+                className="help-button"
+                aria-label="Справка и данные"
+                title="Справка и данные"
+                onClick={() => setHelp(true)}
+              >
+                <CircleHelp size={18} />
+                <span>Справка и данные</span>
+              </button>
+            </div>
             <div className="export-wrap">
               <button
                 className="primary export-button"
@@ -1663,15 +1665,14 @@ function Workbench({
                 <i />
                 Расчёт метрик: {analysis.elapsed_seconds.toFixed(2)} с
               </span>
-              <span>Только наблюдаемые данные · без внешнего обогащения</span>
+              <span className="page-footer-credit">
+                Решение команды uniqore.ai на хакатоне hackalem.ai
+              </span>
               <span>
                 Анализ <code>{analysis.analysis_id.slice(0, 8)}</code> · v
                 {analysis.algorithm_version}
               </span>
             </div>
-            <p className="page-footer-credit">
-              Решение команды uniqore.ai на хакатоне hackalem.ai
-            </p>
           </footer>
         </main>
       </div>
