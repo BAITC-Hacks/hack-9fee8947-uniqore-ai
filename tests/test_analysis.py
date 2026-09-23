@@ -183,7 +183,7 @@ def test_invalid_input_fails_before_classification(frames, change):
     elif change == "fractional_gid":
         nodes["gid"] = nodes.gid.astype(float)
     elif change == "date":
-        tx.loc[0, "date"] = pd.Timestamp("2026-08-01")
+        tx.loc[0, "date"] = "not-a-date"
     elif change == "nan":
         tx.loc[0, "sum_kzt"] = float("nan")
     elif change == "negative":

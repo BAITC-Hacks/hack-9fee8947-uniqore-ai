@@ -17,9 +17,11 @@ const period = (start: string, end: string) => {
 export function DatasetPassport({
   analysis,
   onNetwork,
+  onRestore,
 }: {
   analysis: Analysis;
   onNetwork: () => void;
+  onRestore?: () => void;
 }) {
   const dataset = analysis.dataset;
   const verified = dataset?.verification.status === "passed";
@@ -30,7 +32,11 @@ export function DatasetPassport({
     >
       <div className="passport-result">
         <div>
-          <strong>Предоставленный набор</strong>
+          <strong>
+            {dataset?.source === "uploaded"
+              ? "Загруженный набор"
+              : "Исходный набор"}
+          </strong>
           <span>
             {analysis.summary.n_seeds} исходных клиентов{" "}
             <ArrowRight size={12} /> {number(analysis.summary.n_nodes)} узлов ·{" "}
@@ -38,11 +44,21 @@ export function DatasetPassport({
             {number(analysis.summary.n_transactions)} операций
           </span>
         </div>
-        <button onClick={onNetwork}>
-          Обзор сети <ArrowRight size={13} />
-        </button>
+        <div className="passport-actions">
+          {onRestore && (
+            <button onClick={onRestore}>Вернуть исходный набор</button>
+          )}
+          <button onClick={onNetwork}>
+            Обзор сети <ArrowRight size={13} />
+          </button>
+        </div>
       </div>
       <div className="passport-meta">
+        {dataset?.source === "uploaded" && (
+          <span className="dataset-temporary">
+            Временный набор · до 1 часа или перезапуска сервера
+          </span>
+        )}
         <span>
           {(
             dataset?.files.map((file) => file.name) || [
@@ -77,8 +93,11 @@ export function DatasetPassport({
               )}
             </strong>
             <p>
-              Расчёт уже выполнен командой запуска: исходные файлы → метрики →
-              гипотезы ролей и групп → приоритеты → интерфейс и CSV.
+              {dataset?.source === "uploaded"
+                ? "Расчёт выполнен после загрузки"
+                : "Расчёт выполнен командой запуска"}
+              : исходные файлы → метрики → гипотезы ролей и групп → приоритеты →
+              интерфейс и CSV.
             </p>
             <p>
               Замер включает обработку, запись и проверку CSV. Расчёт метрик:{" "}
