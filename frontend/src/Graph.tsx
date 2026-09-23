@@ -2,12 +2,13 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { GraphEdge, GraphNode, roles, shortId } from "./types";
-import { graphScope } from "./graphScope";
+import { applyFilterHighlight, graphScope } from "./graphScope";
 
 export interface GraphHandle {
   fit: () => void;
@@ -23,6 +24,7 @@ interface Props {
   scope: "ego" | "all";
   hops: number;
   allowed: Set<string>;
+  highlightMatches?: boolean;
   direction: "both" | "in" | "out";
   colorBy: "role" | "cluster";
   days: [number, number];
@@ -37,7 +39,20 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
   } | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const instance = useRef<Core | null>(null);
-  const renderedScope = useRef(props.scope);
+  const fullNetwork = useMemo(
+    () => new Set(props.nodes.map((node) => node.gid)),
+    [props.nodes],
+  );
+  const nodeById = useMemo(
+    () => new Map(props.nodes.map((node) => [node.gid, node])),
+    [props.nodes],
+  );
+  const displayScope = props.highlightMatches ? "all" : props.scope;
+  const displayAllowed = props.highlightMatches ? fullNetwork : props.allowed;
+  const displaySelected = props.highlightMatches ? "" : props.selected;
+  const displayHops = props.highlightMatches ? 0 : props.hops;
+  const displayDirection = props.highlightMatches ? "both" : props.direction;
+  const renderedScope = useRef(displayScope);
   const saved = useRef(new Map<string, { x: number; y: number }>());
   const latest = useRef(props);
   latest.current = props;
@@ -96,6 +111,38 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
             opacity: 0.75,
           },
         },
+        {
+          selector: "node.filter-muted",
+          style: { opacity: 0.32, "text-opacity": 0.25 },
+        },
+        {
+          selector: "node.filter-match",
+          style: { opacity: 1 },
+        },
+        {
+          selector: "node.filter-emphasis",
+          style: {
+            width: "data(highlightSize)",
+            height: "data(highlightSize)",
+            "border-width": "data(highlightBorderWidth)",
+            "underlay-color": "#00b5c8",
+            "underlay-opacity": 0.26,
+            "underlay-padding": "data(highlightPadding)",
+            "z-index": 10,
+          },
+        },
+        {
+          selector: "edge.filter-muted",
+          style: { opacity: 0.12 },
+        },
+        {
+          selector: "edge.filter-match-edge",
+          style: {
+            "line-color": "#61aeb4",
+            "target-arrow-color": "#367f88",
+            opacity: 0.8,
+          },
+        },
         { selector: "node:selected", style: { "overlay-opacity": 0 } },
         {
           selector: ".chosen",
@@ -117,12 +164,33 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
           },
         },
         {
+          selector: "node.boundary.filter-emphasis",
+          style: { "border-width": "data(highlightBorderWidth)" },
+        },
+        {
           selector: ".selected-edge",
           style: {
             "line-color": "#70b4bb",
             "target-arrow-color": "#408d98",
             opacity: 0.85,
           },
+        },
+        {
+          selector: "node.filter-selected",
+          style: {
+            opacity: 1,
+            "text-opacity": 1,
+            width: "data(selectedSize)",
+            height: "data(selectedSize)",
+            "border-color": "#00313d",
+            "border-width": "data(selectedBorderWidth)",
+            "font-size": "data(selectedFontSize)",
+            "z-index": 30,
+          },
+        },
+        {
+          selector: "edge.selected-edge.filter-muted",
+          style: { opacity: 0.4 },
         },
         {
           selector: ".inspected-edge",
@@ -136,6 +204,15 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
           },
         },
         { selector: ".inactive", style: { opacity: 0.12 } },
+        { selector: "edge.filter-muted.inactive", style: { opacity: 0.025 } },
+        {
+          selector: "edge.inspected-edge.filter-muted",
+          style: { opacity: 1 },
+        },
+        {
+          selector: "edge.inspected-edge.inactive",
+          style: { opacity: 0.55, "line-style": "dashed" },
+        },
         { selector: "node:active", style: { "overlay-opacity": 0 } },
       ] as cytoscape.StylesheetStyle[],
     });
@@ -162,9 +239,13 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     });
     cy.on("mouseout", "node", () => setHover(null));
     cy.on("pan zoom", () => setHover(null));
+    cy.on("zoom", () => {
+      if (latest.current.highlightMatches)
+        applyFilterHighlight(cy, latest.current.allowed, true);
+    });
     cy.on("dragfree", "node", (event) =>
       saved.current.set(
-        `${latest.current.scope}:${event.target.id()}`,
+        `${latest.current.highlightMatches ? "all" : latest.current.scope}:${event.target.id()}`,
         event.target.position(),
       ),
     );
@@ -177,7 +258,8 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       if (width !== previousWidth || height !== previousHeight) {
         previousWidth = width;
         previousHeight = height;
-        if (cy.elements().length) cy.fit(cy.elements(), 45);
+        if (cy.elements().length && !latest.current.highlightMatches)
+          cy.fit(cy.elements(), 45);
       }
     });
     observer.observe(container.current);
@@ -192,11 +274,12 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     if (!cy) return;
     const view = graphScope(
       props.edges,
-      props.allowed,
-      props.selected,
-      props.scope,
-      props.hops,
-      props.direction,
+      displayAllowed,
+      displaySelected,
+      displayScope,
+      displayHops,
+      displayDirection,
+      props.highlightMatches ? fullNetwork : undefined,
     );
     const visible = view.nodes;
     const shown = props.nodes.filter((n) => visible.has(n.gid));
@@ -216,7 +299,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       const initial = {
         x:
           (Math.cos(centerAngle) * centerRadius + Math.cos(angle) * radius) *
-          (props.scope === "all" ? 1.7 : 1),
+          (displayScope === "all" ? 1.7 : 1),
         y: Math.sin(centerAngle) * centerRadius + Math.sin(angle) * radius,
       };
       const color =
@@ -239,7 +322,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
               ? 46
               : Math.min(35, 17 + Math.sqrt(n.in_degree + n.out_degree) * 2.1),
         },
-        position: saved.current.get(`${props.scope}:${n.gid}`) || initial,
+        position: saved.current.get(`${displayScope}:${n.gid}`) || initial,
         classes: [
           n.gid === props.selected ? "chosen" : "",
           n.boundary ? "boundary" : "",
@@ -269,7 +352,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     cy.nodes().forEach((n) => {
       saved.current.set(`${renderedScope.current}:${n.id()}`, n.position());
     });
-    renderedScope.current = props.scope;
+    renderedScope.current = displayScope;
     cy.batch(() => {
       cy.elements().remove();
       cy.add(elements);
@@ -277,7 +360,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
     if (
       shown.length > 1 &&
       shown.length < 180 &&
-      shown.some((n) => !saved.current.has(`${props.scope}:${n.gid}`))
+      shown.some((n) => !saved.current.has(`${displayScope}:${n.gid}`))
     ) {
       cy.layout({
         name: "cose",
@@ -297,10 +380,10 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       }));
       cy.fit(cy.elements(), 45);
       cy.nodes().forEach((n) => {
-        saved.current.set(`${props.scope}:${n.id()}`, n.position());
+        saved.current.set(`${displayScope}:${n.id()}`, n.position());
       });
     } else cy.fit(cy.elements(), 55);
-    if (shown.length < 180 && shown.length) {
+    if (!props.highlightMatches && shown.length < 180 && shown.length) {
       const zoom = cy.zoom();
       cy.batch(() => {
         cy.nodes().forEach((n) => {
@@ -321,12 +404,63 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
   }, [
     props.nodes,
     props.edges,
+    displaySelected,
+    displayScope,
+    displayHops,
+    displayAllowed,
+    props.colorBy,
+    displayDirection,
+    props.highlightMatches,
+    fullNetwork,
+  ]);
+  useEffect(() => {
+    const cy = instance.current;
+    if (!cy) return;
+    // Selection and filters only update classes in full-network highlighting mode.
+    const nodeCount = cy.nodes().length;
+    cy.batch(() => {
+      cy.nodes().forEach((node) => {
+        const selected = node.id() === props.selected;
+        node.toggleClass("chosen", selected);
+        const source = nodeById.get(node.id());
+        if (source) {
+          node.data(
+            "size",
+            selected
+              ? 46
+              : Math.min(
+                  35,
+                  17 + Math.sqrt(source.in_degree + source.out_degree) * 2.1,
+                ),
+          );
+          node.data(
+            "label",
+            selected || nodeCount < 16 || (nodeCount < 100 && source.rank <= 10)
+              ? shortId(source.gid)
+              : "",
+          );
+        }
+      });
+      cy.edges().forEach((edge) => {
+        edge.toggleClass(
+          "selected-edge",
+          edge.source().id() === props.selected ||
+            edge.target().id() === props.selected,
+        );
+      });
+    });
+    applyFilterHighlight(cy, props.allowed, Boolean(props.highlightMatches));
+  }, [
+    props.allowed,
+    props.highlightMatches,
     props.selected,
+    props.nodes,
+    props.edges,
     props.scope,
     props.hops,
-    props.allowed,
-    props.colorBy,
     props.direction,
+    props.colorBy,
+    nodeById,
   ]);
   useEffect(() => {
     const cy = instance.current;
@@ -336,6 +470,7 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
       cy.getElementById(props.selectedEdgeId).addClass("inspected-edge");
   }, [
     props.selectedEdgeId,
+    props.highlightMatches,
     props.nodes,
     props.edges,
     props.selected,

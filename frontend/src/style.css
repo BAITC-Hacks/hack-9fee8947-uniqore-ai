@@ -2537,3 +2537,106 @@ main {
   color: var(--accent);
   font-size: 11px;
 }
+
+/* Shared rows keep the same client facts in every list filter. */
+.client-row {
+  display: block;
+  margin-bottom: 4px;
+}
+.client-row-select {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+.client-row .rank {
+  width: auto;
+  min-width: 20px;
+  padding-top: 2px;
+}
+.row-review-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 7px 0 0 28px;
+  padding: 4px 6px;
+  border: 1px solid var(--accent-border);
+  border-radius: 5px;
+  color: var(--accent);
+  font-size: 10px;
+}
+.row-review-toggle.added {
+  color: #377e64;
+  background: #eff8f1;
+}
+.review-expanded .queue-node strong {
+  font-size: 10px;
+  letter-spacing: 0;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.review-expanded .queue-reason {
+  display: block;
+  overflow: visible;
+}
+.review-next-action {
+  margin: 8px 0 0 28px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #52707e;
+}
+.review-next-action strong {
+  font-weight: 600;
+}
+.queue-mode {
+  flex-wrap: wrap;
+}
+.queue-mode button {
+  padding: 6px 5px;
+}
+.queue-mode span {
+  font-variant-numeric: tabular-nums;
+}
+.list-scope-note {
+  margin: 0 7px 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #718399;
+}
+.graph-filter-mode {
+  color: var(--accent);
+}
+.review-list .review-count {
+  margin: 6px 0;
+  font-size: 10px;
+}
+.graph-heading > div:first-child {
+  min-width: 0;
+}
+.graph-heading > div:first-child > span {
+  display: block;
+  line-height: 1.4;
+}
+@media (max-width: 600px) {
+  .graph-filter-mode {
+    grid-column: 1 / -1;
+  }
+  .queue-mode button {
+    white-space: nowrap;
+  }
+  .review-expanded .queue-node strong {
+    font-size: 11px;
+  }
+}
+.graph-legend .match-dot {
+  background: #318b95;
+  box-shadow: 0 0 0 3px #85d3ce;
+}
+
+/* Keep graph height stable when the match count changes. */
+.filter-count {
+  flex-basis: 100%;
+  margin-left: 0;
+  text-align: right;
+}

@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Copy,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, ShieldCheck } from "lucide-react";
 import {
   type Analysis,
   type Cluster,
@@ -243,16 +236,14 @@ export function ClusterCard({
   );
 }
 
-export function ReviewList({
+export function ReviewTools({
   nodes,
   analysisId,
-  onSelect,
-  onRemove,
+  visibleCount,
 }: {
   nodes: GraphNode[];
   analysisId: string;
-  onSelect: (gid: string) => void;
-  onRemove: (gid: string) => void;
+  visibleCount: number;
 }) {
   const [copied, setCopied] = useState("");
   const [fallback, setFallback] = useState("");
@@ -284,11 +275,15 @@ export function ReviewList({
       </p>
       {nodes.length ? (
         <>
+          <p className="review-count">
+            Показано {visibleCount} из {nodes.length}. Копирование включает весь
+            перечень, в том числе скрытых фильтрами клиентов.
+          </p>
           <div className="review-copy-actions">
             <button onClick={() => copy(false)}>
-              <Copy size={13} /> Скопировать перечень
+              <Copy size={13} /> Скопировать весь перечень ({nodes.length})
             </button>
-            <button onClick={() => copy(true)}>Только полные gid</button>
+            <button onClick={() => copy(true)}>Все полные gid</button>
           </div>
           {copied && (
             <p role="status" className="copy-status">
@@ -304,36 +299,11 @@ export function ReviewList({
               onFocus={(event) => event.currentTarget.select()}
             />
           )}
-          {nodes.map((node) => (
-            <article key={node.gid}>
-              <div>
-                <button
-                  className="review-client"
-                  onClick={() => onSelect(node.gid)}
-                >
-                  {node.gid}
-                </button>
-                <button
-                  title={`Убрать ${node.gid} из перечня`}
-                  aria-label={`Убрать ${node.gid} из перечня`}
-                  onClick={() => onRemove(node.gid)}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-              <p>
-                <strong>Основание:</strong> {node.why}
-              </p>
-              <p>
-                <strong>Следующий шаг:</strong> {node.next_action}
-              </p>
-            </article>
-          ))}
         </>
       ) : (
         <div className="review-empty">
-          Откройте досье и нажмите «Добавить на проверку». Здесь появятся
-          выбранные вами клиенты с основаниями и следующими действиями.
+          Нажмите «Добавить на проверку» в списке клиентов или досье. Здесь
+          появятся выбранные вами клиенты с основаниями и следующими действиями.
         </div>
       )}
       <small>

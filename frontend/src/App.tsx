@@ -26,12 +26,13 @@ import {
   CornerDownRight,
 } from "lucide-react";
 import { Graph, GraphHandle } from "./Graph";
+import { ClientRow } from "./ClientRow";
 import { RoleExplanation } from "./RoleExplanation";
 import {
   DatasetPassport,
   PrioritySummary,
   ClusterCard,
-  ReviewList,
+  ReviewTools,
 } from "./ScenarioPanels";
 import {
   Analysis,
@@ -76,10 +77,8 @@ export function App() {
   const [seedOnly, setSeedOnly] = useState(false);
   const [depthFilter, setDepthFilter] = useState("all");
   const [direction, setDirection] = useState<"both" | "in" | "out">("both");
-  const [leftTab, setLeftTab] = useState<"queue" | "clusters" | "review">(
-    "queue",
-  );
-  const [queueView, setQueueView] = useState<"top" | "all">("top");
+  const [leftTab, setLeftTab] = useState<"queue" | "clusters">("queue");
+  const [queueView, setQueueView] = useState<"top" | "all" | "review">("all");
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [review, setReview] = useState<{ analysisId: string; gids: string[] }>({
     analysisId: "",
@@ -88,7 +87,7 @@ export function App() {
   const [searchNotice, setSearchNotice] = useState("");
   const clusterReturn = useRef<{
     selected: string;
-    leftTab: "queue" | "clusters" | "review";
+    leftTab: "queue" | "clusters";
     scope: "ego" | "all";
     roleFilter: string;
     clusterFilter: string;
@@ -96,10 +95,12 @@ export function App() {
     seedOnly: boolean;
     colorBy: "role" | "cluster";
     query: string;
-    queueView: "top" | "all";
+    queueView: "top" | "all" | "review";
+    highlightMatches: boolean;
     detailTab: "overview" | "priority" | "transactions" | "assistant";
   } | null>(null);
-  const [scope, setScope] = useState<"ego" | "all">("ego");
+  const [scope, setScope] = useState<"ego" | "all">("all");
+  const [highlightMatches, setHighlightMatches] = useState(false);
   const [hops, setHops] = useState(1);
   const [colorBy, setColorBy] = useState<"role" | "cluster">("role");
   const [days, setDays] = useState<[number, number]>(emptyDays);
@@ -130,7 +131,15 @@ export function App() {
   useEffect(() => {
     setRowLimit(50);
     queueList.current?.scrollTo(0, 0);
-  }, [roleFilter, clusterFilter, depthFilter, seedOnly, query, leftTab]);
+  }, [
+    roleFilter,
+    clusterFilter,
+    depthFilter,
+    seedOnly,
+    query,
+    leftTab,
+    queueView,
+  ]);
 
   useEffect(() => {
     if (help) helpDialog.current?.showModal();
@@ -208,6 +217,12 @@ export function App() {
     () => [...(analysis?.nodes || [])].sort((a, b) => a.rank - b.rank),
     [analysis],
   );
+  const reviewNodes =
+    review.analysisId === analysis?.analysis_id
+      ? review.gids
+          .map((gid) => analysis.nodes.find((n) => n.gid === gid))
+          .filter((n): n is GraphNode => Boolean(n))
+      : [];
   const exactMatch = analysis?.nodes.find((n) => n.gid === query.trim());
   const queue = useMemo(() => {
     const search = query.trim();
@@ -219,8 +234,14 @@ export function App() {
     }
     return queueView === "top"
       ? orderedNodes.slice(0, 20)
-      : orderedNodes.filter((n) => allowed.has(n.gid));
-  }, [orderedNodes, allowed, query, queueView]);
+      : orderedNodes.filter(
+          (n) =>
+            allowed.has(n.gid) &&
+            (queueView !== "review" ||
+              (review.analysisId === analysis?.analysis_id &&
+                review.gids.includes(n.gid))),
+        );
+  }, [orderedNodes, allowed, query, queueView, review, analysis?.analysis_id]);
   const filteredClusters = useMemo(
     () =>
       (analysis?.clusters || [])
@@ -239,20 +260,16 @@ export function App() {
   const graphAllowed = useMemo(
     () =>
       activeCluster === null
-        ? allowed
+        ? leftTab === "queue" && (!query.trim() || highlightMatches)
+          ? new Set(queue.map((n) => n.gid))
+          : allowed
         : new Set(
             (analysis?.nodes || [])
               .filter((n) => n.cluster_id === activeCluster)
               .map((n) => n.gid),
           ),
-    [activeCluster, allowed, analysis],
+    [activeCluster, allowed, analysis, leftTab, queue, query, highlightMatches],
   );
-  const reviewNodes =
-    review.analysisId === analysis?.analysis_id
-      ? review.gids
-          .map((gid) => analysis.nodes.find((n) => n.gid === gid))
-          .filter((n): n is GraphNode => Boolean(n))
-      : [];
   const cluster = analysis?.clusters.find(
     (c) => c.cluster_id === chosen?.cluster_id,
   );
@@ -262,7 +279,8 @@ export function App() {
       Number(t.date.slice(-2)) <= days[1] &&
       (!edge || (t.src === edge.src && t.dst === edge.dst)),
   );
-  const selectedOutside = chosen && !graphAllowed.has(selected);
+  const selectedOutside =
+    !highlightMatches && chosen && !graphAllowed.has(selected);
   const hasFilters =
     roleFilter !== "all" ||
     clusterFilter !== "all" ||
@@ -275,10 +293,23 @@ export function App() {
     setDepthFilter("all");
     setRowLimit(50);
   };
+  const resetSelection = () => {
+    clearFilters();
+    setQueueView("all");
+    setQuery("");
+    setActiveCluster(null);
+    setSearchNotice("");
+  };
+  const selectQueueView = (view: "all" | "review" | "top") => {
+    setQueueView(view);
+    setQuery("");
+    setSearchNotice("");
+    setActiveCluster(null);
+    if (view === "top") clearFilters();
+  };
   const choose = (gid: string, global = false) => {
     setSelected(gid);
     setActiveCluster(null);
-    setScope("ego");
     setEdge(null);
     setDetailTab("overview");
     if (global || activeCluster !== null) {
@@ -290,11 +321,15 @@ export function App() {
   const searchClient = (gid: string) => {
     const outside = !allowed.has(gid);
     choose(gid, true);
+    setQueueView("all");
+    setScope(highlightMatches ? "all" : "ego");
     setLeftTab("queue");
     setSearchNotice(
-      outside
-        ? "Клиент найден во всём наборе. Фильтры сброшены, показано его окружение."
-        : "Показано окружение клиента во всём наборе.",
+      highlightMatches
+        ? "Клиент найден во всём наборе и выделен на полной сети. Фильтры сброшены."
+        : outside
+          ? "Клиент найден во всём наборе. Фильтры сброшены, показано его окружение."
+          : "Показано окружение клиента во всём наборе.",
     );
   };
   const openCluster = (id: number) => {
@@ -310,6 +345,7 @@ export function App() {
         colorBy,
         query,
         queueView,
+        highlightMatches,
         detailTab,
       };
     clearFilters();
@@ -337,6 +373,7 @@ export function App() {
       setColorBy(prior.colorBy);
       setQuery(prior.query);
       setQueueView(prior.queueView);
+      setHighlightMatches(prior.highlightMatches);
       setDetailTab(
         prior.detailTab === "transactions" ? "overview" : prior.detailTab,
       );
@@ -361,7 +398,7 @@ export function App() {
   const onEdge = (e: GraphEdge) => {
     if (activeCluster !== null) {
       clearFilters();
-      setScope("ego");
+      setScope(highlightMatches ? "all" : "ego");
       setDirection("both");
     }
     setActiveCluster(null);
@@ -516,7 +553,9 @@ export function App() {
                 onChange={(e) => {
                   setRoleFilter(e.target.value);
                   setActiveCluster(null);
-                  setQueueView("all");
+                  setQueueView((current) =>
+                    current === "top" ? "all" : current,
+                  );
                   setLeftTab("queue");
                   setQuery("");
                 }}
@@ -537,7 +576,9 @@ export function App() {
                 onChange={(e) => {
                   setClusterFilter(e.target.value);
                   setActiveCluster(null);
-                  setQueueView("all");
+                  setQueueView((current) =>
+                    current === "top" ? "all" : current,
+                  );
                   setLeftTab("queue");
                   setQuery("");
                 }}
@@ -559,7 +600,9 @@ export function App() {
                 onChange={(e) => {
                   setDepthFilter(e.target.value);
                   setActiveCluster(null);
-                  setQueueView("all");
+                  setQueueView((current) =>
+                    current === "top" ? "all" : current,
+                  );
                   setLeftTab("queue");
                   setQuery("");
                 }}
@@ -583,22 +626,40 @@ export function App() {
                 onChange={(e) => {
                   setSeedOnly(e.target.checked);
                   setActiveCluster(null);
-                  setQueueView("all");
+                  setQueueView((current) =>
+                    current === "top" ? "all" : current,
+                  );
                   setLeftTab("queue");
                   setQuery("");
                 }}
               />
               Только seed
             </label>
+            <label className="seed-filter graph-filter-mode">
+              <input
+                type="checkbox"
+                checked={highlightMatches}
+                onChange={(event) => {
+                  setHighlightMatches(event.target.checked);
+                  if (event.target.checked) setScope("all");
+                }}
+              />
+              Подсвечивать на всей сети
+            </label>
             <button
               className="reset-filters"
-              disabled={!hasFilters}
-              onClick={clearFilters}
+              disabled={
+                !hasFilters &&
+                queueView === "all" &&
+                !query.trim() &&
+                activeCluster === null
+              }
+              onClick={resetSelection}
             >
               Сбросить фильтры
             </button>
             <span className="filter-count" aria-live="polite">
-              {number(allowed.size)} из {number(analysis.summary.n_nodes)}{" "}
+              {number(graphAllowed.size)} из {number(analysis.summary.n_nodes)}{" "}
               клиентов
             </span>
           </section>
@@ -613,8 +674,10 @@ export function App() {
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
+                      setQueueView("all");
                       setSearchNotice("");
                       setLeftTab("queue");
+                      setActiveCluster(null);
                       setRowLimit(50);
                     }}
                     onKeyDown={(e) => {
@@ -667,33 +730,30 @@ export function App() {
                 >
                   Группы
                 </button>
-                <button
-                  className={leftTab === "review" ? "active" : ""}
-                  onClick={() => {
-                    setLeftTab("review");
-                    setQuery("");
-                  }}
-                >
-                  На проверку <span>{reviewNodes.length}</span>
-                </button>
               </div>
-              {leftTab === "queue" && !query.trim() && (
+              {leftTab === "queue" && (
                 <div className="queue-mode" aria-label="Список клиентов">
                   <button
-                    className={queueView === "top" ? "active" : ""}
-                    onClick={() => {
-                      setQueueView("top");
-                      clearFilters();
-                      setActiveCluster(null);
-                    }}
-                  >
-                    Топ-20 всего набора
-                  </button>
-                  <button
                     className={queueView === "all" ? "active" : ""}
-                    onClick={() => setQueueView("all")}
+                    aria-pressed={queueView === "all"}
+                    onClick={() => selectQueueView("all")}
                   >
                     Все клиенты
+                  </button>
+                  <button
+                    className={queueView === "review" ? "active" : ""}
+                    aria-pressed={queueView === "review"}
+                    onClick={() => selectQueueView("review")}
+                  >
+                    На проверку <span>{reviewNodes.length}</span>
+                  </button>
+                  <button
+                    className={queueView === "top" ? "active" : ""}
+                    aria-pressed={queueView === "top"}
+                    title="Топ-20 всего набора, как в CSV"
+                    onClick={() => selectQueueView("top")}
+                  >
+                    Топ-20
                   </button>
                 </div>
               )}
@@ -701,76 +761,68 @@ export function App() {
                 <span>
                   {leftTab === "queue"
                     ? `${number(queue.length)} клиентов`
-                    : leftTab === "clusters"
-                      ? `${filteredClusters.length} групп · весь набор`
-                      : `${reviewNodes.length} выбрано вами`}
+                    : `${filteredClusters.length} групп · весь набор`}
                 </span>
                 <span>
-                  {leftTab === "queue"
-                    ? "ПРИОРИТЕТ /100"
-                    : leftTab === "clusters"
-                      ? "КЛИЕНТОВ"
-                      : ""}
+                  {leftTab === "queue" ? "ПРИОРИТЕТ /100" : "КЛИЕНТОВ"}
                 </span>
               </div>
               <div className="queue-list" ref={queueList}>
                 {leftTab === "queue" ? (
                   <>
+                    {queueView === "review" && !query.trim() && (
+                      <ReviewTools
+                        nodes={reviewNodes}
+                        analysisId={analysis.analysis_id}
+                        visibleCount={queue.length}
+                      />
+                    )}
+                    {queueView === "top" && !query.trim() && (
+                      <p className="list-scope-note">
+                        Топ-20 всего набора · совпадает с CSV
+                      </p>
+                    )}
                     {queue.slice(0, rowLimit).map((n) => (
-                      <button
+                      <ClientRow
                         key={n.gid}
-                        className={`queue-item ${n.gid === selected ? "selected" : ""}`}
-                        onClick={() => {
+                        node={n}
+                        selected={n.gid === selected}
+                        inReview={reviewNodes.some(
+                          (item) => item.gid === n.gid,
+                        )}
+                        expanded={queueView === "review" && !query.trim()}
+                        onSelect={() => {
                           if (query.trim()) searchClient(n.gid);
                           else {
                             choose(n.gid, queueView === "top");
-                            if (queueView === "top") setDetailTab("priority");
+                            setDetailTab("priority");
                           }
                         }}
-                        title={n.gid}
-                      >
-                        <span className="rank">
-                          {String(n.rank).padStart(2, "0")}
-                        </span>
-                        <div className="queue-node">
-                          <strong>
-                            {shortId(n.gid)}
-                            {n.is_seed && <span className="seed-mini">S</span>}
-                          </strong>
-                          <span className="queue-role">
-                            <i style={{ background: roles[n.role].color }} />
-                            {n.role === "unknown"
-                              ? roles[n.role].label
-                              : `Гипотеза: ${roles[n.role].label}`}
-                          </span>
-                          <small className="queue-reason">{n.why}</small>
-                          {reviewNodes.some((item) => item.gid === n.gid) && (
-                            <small className="review-marker">
-                              В перечне проверки
-                            </small>
-                          )}
-                        </div>
-                        <span className="queue-score">
-                          {pct(n.priority_score)}
-                          <i style={{ width: `${pct(n.priority_score)}%` }} />
-                        </span>
-                      </button>
+                        onToggleReview={() => toggleReview(n.gid)}
+                      />
                     ))}
-                    {queue.length === 0 && (
-                      <div className="empty-list">
-                        {query.trim()
-                          ? "Такого gid нет в предоставленном наборе. Поиск охватывает всех клиентов."
-                          : "По текущим фильтрам клиентов нет."}
-                        <br />
-                        <button
-                          onClick={() =>
-                            query.trim() ? setQuery("") : clearFilters()
-                          }
-                        >
-                          {query.trim() ? "Очистить поиск" : "Сбросить фильтры"}
-                        </button>
-                      </div>
-                    )}
+                    {queue.length === 0 &&
+                      !(
+                        queueView === "review" &&
+                        reviewNodes.length === 0 &&
+                        !query.trim()
+                      ) && (
+                        <div className="empty-list">
+                          {query.trim()
+                            ? "Такого gid нет в предоставленном наборе. Поиск охватывает всех клиентов."
+                            : "По текущим фильтрам клиентов нет."}
+                          <br />
+                          <button
+                            onClick={() =>
+                              query.trim() ? setQuery("") : clearFilters()
+                            }
+                          >
+                            {query.trim()
+                              ? "Очистить поиск"
+                              : "Сбросить фильтры"}
+                          </button>
+                        </div>
+                      )}
                     {queue.length > rowLimit && (
                       <button
                         className="load-more"
@@ -780,13 +832,6 @@ export function App() {
                       </button>
                     )}
                   </>
-                ) : leftTab === "review" ? (
-                  <ReviewList
-                    nodes={reviewNodes}
-                    analysisId={analysis.analysis_id}
-                    onSelect={(gid) => choose(gid, true)}
-                    onRemove={toggleReview}
-                  />
                 ) : (
                   filteredClusters.map((c) => (
                     <button
@@ -824,7 +869,7 @@ export function App() {
                   <div className="empty-list">
                     Сообществ по этим фильтрам нет.
                     <br />
-                    <button onClick={clearFilters}>Сбросить фильтры</button>
+                    <button onClick={resetSelection}>Сбросить фильтры</button>
                   </div>
                 )}
               </div>
@@ -837,16 +882,21 @@ export function App() {
               <div className="graph-heading">
                 <div>
                   <h2>
-                    {activeCluster !== null
-                      ? `Сообщество ${String(activeCluster).padStart(2, "0")}`
-                      : scope === "ego"
-                        ? "Окружение клиента"
-                        : hasFilters
-                          ? "Сеть по фильтрам"
-                          : "Вся сеть"}
+                    {highlightMatches
+                      ? "Вся сеть · подсветка"
+                      : activeCluster !== null
+                        ? `Сообщество ${String(activeCluster).padStart(2, "0")}`
+                        : scope === "ego"
+                          ? "Окружение клиента"
+                          : graphAllowed.size !== analysis.nodes.length
+                            ? "Сеть по фильтрам"
+                            : "Вся сеть"}
                   </h2>
                   <span>
-                    {visible} из {number(analysis.summary.n_nodes)} узлов
+                    {number(visible)} из {number(analysis.summary.n_nodes)}{" "}
+                    узлов
+                    {highlightMatches &&
+                      ` · подсвечено ${number(graphAllowed.size)}`}
                   </span>
                 </div>
                 <div className="segmented">
@@ -855,6 +905,7 @@ export function App() {
                     onClick={() => {
                       setActiveCluster(null);
                       setScope("ego");
+                      setHighlightMatches(false);
                     }}
                   >
                     Окружение
@@ -863,7 +914,6 @@ export function App() {
                     className={scope === "all" ? "active" : ""}
                     onClick={() => {
                       setActiveCluster(null);
-                      clearFilters();
                       setScope("all");
                     }}
                   >
@@ -929,17 +979,20 @@ export function App() {
                   direction={direction}
                   hops={hops}
                   allowed={graphAllowed}
+                  highlightMatches={highlightMatches}
                   colorBy={colorBy}
                   days={days}
                   onCount={setVisible}
                 />
                 <div className="canvas-top-note">
                   <span className="live-dot" />
-                  {scope === "ego" && direction !== "both"
-                    ? direction === "in"
-                      ? "ВХОДЯЩИЕ МАРШРУТЫ"
-                      : "ИСХОДЯЩИЕ МАРШРУТЫ"
-                    : "НАБЛЮДАЕМЫЕ СВЯЗИ"}
+                  {highlightMatches
+                    ? "ПОДСВЕЧЕНЫ СОВПАДЕНИЯ"
+                    : scope === "ego" && direction !== "both"
+                      ? direction === "in"
+                        ? "ВХОДЯЩИЕ МАРШРУТЫ"
+                        : "ИСХОДЯЩИЕ МАРШРУТЫ"
+                      : "НАБЛЮДАЕМЫЕ СВЯЗИ"}
                   {scope === "ego" && (
                     <span>
                       {" "}
@@ -947,6 +1000,18 @@ export function App() {
                     </span>
                   )}
                 </div>
+                {!highlightMatches &&
+                  graphAllowed.size === 0 &&
+                  scope === "all" && (
+                    <div className="canvas-empty">
+                      <Filter size={25} />
+                      <strong>Нет клиентов в выборке</strong>
+                      <span>
+                        Измените фильтры или включите подсветку, чтобы увидеть
+                        всю сеть.
+                      </span>
+                    </div>
+                  )}
                 {chosen?.isolated && scope === "ego" && !selectedOutside && (
                   <div className="canvas-empty">
                     <GitBranch size={26} />
@@ -963,7 +1028,7 @@ export function App() {
                     <button onClick={() => setScope("all")}>
                       Показать выборку на графе
                     </button>
-                    <button onClick={clearFilters}>Сбросить фильтры</button>
+                    <button onClick={resetSelection}>Сбросить фильтры</button>
                   </div>
                 )}
                 <div className="canvas-controls">
@@ -988,6 +1053,15 @@ export function App() {
                   </button>
                 </div>
                 <div className="graph-legend">
+                  {highlightMatches && (
+                    <span>
+                      <i className="match-dot" />
+                      Ореол — совпадение с фильтрами
+                    </span>
+                  )}
+                  {highlightMatches && (
+                    <span>Тёмный контур — выбранный клиент</span>
+                  )}
                   {colorBy === "role" ? (
                     (Object.keys(roles) as Role[]).map((r) => (
                       <span key={r}>
