@@ -143,6 +143,101 @@ def money(value: float) -> str:
     return f"{value:,.0f} ₸".replace(",", " ")
 
 
+def explain_role(row: pd.Series, role: str, support: float, threshold_in: int,
+                 threshold_out: int, threshold_b: float, limitations: list[str]) -> dict:
+    """Describe the actual ordered rule and its heuristic score, not accuracy.
+
+    Raw observations and thresholds retain precision so callers can distinguish
+    decisions at a threshold boundary.
+    """
+    def criterion(key, label, observed, operator, threshold):
+        passed = False
+        if observed is not None and threshold is not None:
+            if operator == "gte":
+                passed = observed >= threshold
+            elif operator == "eq":
+                passed = observed == threshold
+            elif operator == "between":
+                passed = threshold[0] <= observed <= threshold[1]
+        return {"key": key, "label": label, "observed": observed, "operator": operator,
+                "threshold": threshold, "passed": bool(passed)}
+
+    inbound = criterion("in_degree", "Клиентов-отправителей", int(row.in_degree), "gte", 1)
+    outbound = criterion("out_degree", "Клиентов-получателей", int(row.out_degree), "gte", 1)
+    inside = criterion("boundary", "На границе наблюдения", bool(row.depth == 4), "eq", False)
+    rules = {
+        "coordinator": [inbound, outbound,
+                        criterion("betweenness", "Посредничество в сети", float(row.betweenness), "gte",
+                                  None if math.isinf(threshold_b) else threshold_b),
+                        criterion("neighbor_clusters", "Сообществ у соседей", int(row.neighbor_clusters), "gte", 2),
+                        criterion("seed_reach", "Достижим из исходных клиентов", int(row.seed_reach), "gte", 2)],
+        "consolidator": [criterion("in_degree", "Клиентов-отправителей", int(row.in_degree), "gte", threshold_in),
+                         criterion("boundary", "На границе: перевес входящих не проверяется", True, "eq", True)
+                         if row.depth == 4 else
+                         criterion("in_dominance", "Отправителей ≥ 2 × получателей", int(row.in_degree), "gte", 2 * int(row.out_degree))],
+        "distributor": [criterion("out_degree", "Клиентов-получателей", int(row.out_degree), "gte", threshold_out),
+                        criterion("is_seed", "Исходный клиент: перевес исходящих не проверяется", True, "eq", True)
+                        if row.is_seed else
+                        criterion("out_dominance", "Получателей ≥ 2 × отправителей", int(row.out_degree), "gte", 2 * int(row.in_degree))],
+        "transit": [criterion("is_seed", "Исходный клиент", bool(row.is_seed), "eq", False), inside,
+                    inbound, outbound,
+                    criterion("ratio", "Отношение выхода к входу", None if pd.isna(row.ratio) else float(row.ratio), "between", [.8, 1.2])],
+        "terminal": [inbound, criterion("out_degree", "Клиентов-получателей", int(row.out_degree), "eq", 0), inside],
+    }
+    excluded = []
+    if row.degree == 0:
+        criteria = [criterion("degree", "Наблюдаемых связей", 0, "eq", 0)]
+        selection = "Нет наблюдаемых связей: данных для гипотезы недостаточно."
+    else:
+        for candidate, checks in rules.items():
+            if candidate == role:
+                break
+            excluded.append({"role": candidate, "label": ROLES[candidate],
+                             "unmet_criteria": [check for check in checks if not check["passed"]]})
+        if role in rules:
+            criteria = rules[role]
+            selection = "Выбрано первое выполненное правило; правила более поздних ролей не сравниваются по баллам."
+        else:
+            criteria = [criterion("specialized_rule", "Есть выполненное правило другой роли", False, "eq", False),
+                        criterion("boundary", "На границе наблюдения", bool(row.depth == 4), "eq", role == "unknown")]
+            selection = ("На границе выгрузки данных для гипотезы недостаточно."
+                         if role == "unknown" else "Ни одно из пяти правил выраженных ролей не выполнено.")
+
+    score_fields = {
+        "coordinator": [("q_betweenness", "Ранг посредничества", .5), ("q_seed_reach", "Ранг достижимости из исходных клиентов", .5)],
+        "consolidator": [("q_in_degree", "Ранг числа отправителей", .5), ("q_in_tx", "Ранг входящих переводов", .5)],
+        "distributor": [("q_out_degree", "Ранг числа получателей", .5), ("q_out_tx", "Ранг исходящих переводов", .5)],
+        "transit": [("balance", "Меньший поток / больший поток", .6), ("temporal_fraction", "Совместимый объём с лагом 1–2 дня / больший поток", .4)],
+        "terminal": [("q_in_cents", "Ранг входящей суммы", .5), ("q_in_tx", "Ранг входящих переводов", .5)],
+        "peripheral": [("q_degree", "Ранг числа связей", None), ("q_flow", "Ранг объёма", None), ("q_betweenness", "Ранг посредничества", None)],
+        "unknown": [],
+    }
+    cap = .5 if role == "consolidator" and row.depth == 4 else None
+    formula = ("1 − максимум трёх рангов" if role == "peripheral" else
+               "0: данных для гипотезы недостаточно" if role == "unknown" else
+               "Сумма факторов с указанными весами")
+    if cap is not None:
+        formula += "; на границе выгрузки результат ограничен 50/100"
+    return {
+        "status": "insufficient_data" if role == "unknown" else "hypothesis",
+        "criteria": criteria,
+        "selection": selection,
+        "rule_order": list(rules),
+        "excluded_rules": excluded,
+        "threshold_method": ("Порог отправителей: максимум из 3 и округлённого вверх 75-го перцентиля положительных входящих степеней; "
+                             "получателей: максимум из 10 и такого же перцентиля исходящих степеней; "
+                             "посредничества: 90-й перцентиль положительных значений. Если положительных значений нет, правило координатора недоступно."),
+        "score": {
+            "kind": "heuristic_support", "value": round(float(support), 6), "formula": formula, "cap": cap,
+            "factors": [{"key": key, "label": label, "value": float(row[key]), "weight": weight}
+                        for key, label, weight in score_fields[role]],
+            "rank_method": "Ранги рассчитаны среди клиентов с наблюдаемыми связями; совпадения получают средний ранг, нулевые значения — 0.",
+            "interpretation": "Поддержка признаками по правилам, не вероятность и не точность. На размеченных данных точность не измерялась; баллы разных ролей не сравниваются.",
+        },
+        "limitations": limitations,
+    }
+
+
 def analyze(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame, input_hashes: dict | None = None) -> dict:
     started = time.perf_counter()
     nodes, edges, tx = validate_frames(nodes, edges, tx)
@@ -259,6 +354,7 @@ def analyze(nodes: pd.DataFrame, edges: pd.DataFrame, tx: pd.DataFrame, input_ha
             "ratio": None if pd.isna(row.ratio) else round(float(row.ratio), 4),
             "temporal_fraction": round(float(row.temporal_fraction), 6), "matched_amount": int(row.matched_cents) / 100,
             "evidence": evidence[:200], "limitations": limitations, "next_action": next_action,
+            "role_explanation": explain_role(row, role, support, threshold_in, threshold_out, threshold_b, limitations),
             "observed_sink": bool(row.in_degree > 0 and row.out_degree == 0),
             "priority_factors": {"volume": round(.35 * row.q_flow, 6), "bridge": round(.25 * row.q_betweenness, 6),
                                  "seed_reach": round(.25 * row.q_seed_reach, 6), "activity": round(.15 * row.q_n_tx, 6)},

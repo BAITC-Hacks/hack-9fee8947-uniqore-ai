@@ -1,11 +1,12 @@
 import math
+import json
 from collections import Counter
 from decimal import Decimal
 
 import pandas as pd
 import pytest
 
-from moneygraph.analysis import DataError, analyze, temporal_match, validate_frames, verify_outputs
+from moneygraph.analysis import DataError, analyze, explain_role, temporal_match, validate_frames, verify_outputs
 from conftest import DATA
 
 
@@ -42,6 +43,91 @@ def test_censored_nodes_seeds_isolates(analysis):
     assert all(n["role_score"] <= .5 for n in boundary)
     assert all(n["role"] != "transit" for n in nodes if n["is_seed"])
     assert any(n["priority_score"] > .5 for n in nodes if n["role"] == "unknown")
+
+
+def test_role_explanation_matches_decisions_and_scores(analysis):
+    """Each chosen rule passes; every earlier rule has an observed failure."""
+    parameters = analysis["manifest"]["parameters"]
+    for node in analysis["nodes"]:
+        explanation = node["role_explanation"]
+        assert all(c["passed"] for c in explanation["criteria"])
+        assert all(rule["unmet_criteria"] for rule in explanation["excluded_rules"])
+        assert all(not c["passed"] for rule in explanation["excluded_rules"] for c in rule["unmet_criteria"])
+        assert explanation["limitations"] == node["limitations"]
+        score = explanation["score"]
+        assert score["kind"] == "heuristic_support"
+        assert score["value"] == node["role_score"]
+        assert "не вероятность и не точность" in score["interpretation"]
+        factors = score["factors"]
+        if node["role"] == "unknown":
+            assert explanation["status"] == "insufficient_data"
+            assert not factors and score["value"] == 0
+        else:
+            assert explanation["status"] == "hypothesis"
+            expected = (1 - max(f["value"] for f in factors) if node["role"] == "peripheral"
+                        else sum(f["value"] * f["weight"] for f in factors))
+            if score["cap"] is not None:
+                expected = min(expected, score["cap"])
+            assert score["value"] == pytest.approx(expected, abs=5.1e-7)
+        for criterion in explanation["criteria"]:
+            if criterion["key"] in node:
+                assert criterion["observed"] == pytest.approx(node[criterion["key"]], abs=5.1e-5)
+        criteria = {c["key"]: c for c in explanation["criteria"]}
+        if node["role"] == "coordinator":
+            assert criteria["betweenness"]["threshold"] == parameters["coordinator_betweenness_threshold"]
+            assert criteria["seed_reach"]["threshold"] == 2
+            assert criteria["neighbor_clusters"]["threshold"] == 2
+        elif node["role"] == "consolidator":
+            assert criteria["in_degree"]["threshold"] == parameters["in_degree_threshold"]
+        elif node["role"] == "distributor":
+            assert criteria["out_degree"]["threshold"] == parameters["out_degree_threshold"]
+        elif node["role"] == "transit":
+            assert criteria["ratio"]["threshold"] == parameters["transit_ratio"]
+        if node["role"] in explanation["rule_order"]:
+            index = explanation["rule_order"].index(node["role"])
+            assert [r["role"] for r in explanation["excluded_rules"]] == explanation["rule_order"][:index]
+    # The API serializer must not encounter Infinity/NaN in observations or thresholds.
+    json.dumps([n["role_explanation"] for n in analysis["nodes"]], allow_nan=False)
+
+
+def test_role_explanation_censoring_and_fallback(analysis):
+    for node in analysis["nodes"]:
+        explanation = node["role_explanation"]
+        criteria = {c["key"]: c for c in explanation["criteria"]}
+        if node["isolated"]:
+            assert list(criteria) == ["degree"] and criteria["degree"]["observed"] == 0
+            assert not explanation["excluded_rules"]
+        if node["role"] == "consolidator" and node["boundary"]:
+            assert explanation["score"]["cap"] == .5
+            assert criteria["boundary"]["observed"] is True
+            assert "in_dominance" not in criteria
+        if node["role"] == "distributor" and node["is_seed"]:
+            assert criteria["is_seed"]["observed"] is True
+            assert "out_dominance" not in criteria
+        if node["role"] == "peripheral" or (node["role"] == "unknown" and not node["isolated"]):
+            assert len(explanation["excluded_rules"]) == 5
+            assert criteria["boundary"]["threshold"] == (node["role"] == "unknown")
+
+
+def test_role_explanation_preserves_threshold_precision_and_unavailable_threshold():
+    row = pd.Series({"in_degree": 1, "out_degree": 1, "degree": 2, "depth": 0,
+                     "is_seed": True, "betweenness": .000000123456788, "neighbor_clusters": 2,
+                     "seed_reach": 2, "ratio": 1.0, "q_degree": .2, "q_flow": .3,
+                     "q_betweenness": .4, "q_seed_reach": .7})
+    threshold = .000000123456789
+    explanation = explain_role(row, "peripheral", .6, 3, 10, threshold, [])
+    failure = next(c for c in explanation["excluded_rules"][0]["unmet_criteria"] if c["key"] == "betweenness")
+    assert failure["observed"] == row.betweenness
+    assert failure["threshold"] == threshold
+    assert failure["passed"] is False
+    # No positive betweenness in a graph makes the coordinator threshold unavailable.
+    explanation = explain_role(row, "peripheral", .6, 3, 10, math.inf, [])
+    failure = next(c for c in explanation["excluded_rules"][0]["unmet_criteria"] if c["key"] == "betweenness")
+    assert failure["threshold"] is None and not failure["passed"]
+    json.dumps(explanation, allow_nan=False)
+    explanation = explain_role(row, "coordinator", .55, 3, 10, row.betweenness, [])
+    assert all(c["passed"] for c in explanation["criteria"])
+    assert not explanation["excluded_rules"]
 
 
 @pytest.mark.parametrize("incoming,outgoing,expected", [
