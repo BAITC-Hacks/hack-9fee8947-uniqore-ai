@@ -544,7 +544,7 @@ function Workbench({
           width="1793"
           height="877"
         />
-        <h1>Финансовые связи становятся понятными</h1>
+        <h1>Скрытые финансовые связи становятся понятными</h1>
         {error ? (
           <>
             <p>{error}</p>
@@ -579,7 +579,7 @@ function Workbench({
             <img src="/tyuin-logo.png" alt="Tyuin" width="1793" height="877" />
           </a>
           <span className="header-divider" />
-          <span className="product-name">Финансовые связи</span>
+          <span className="product-name">Скрытые финансовые связи</span>
           <span className="workspace-period">
             {displayPeriod(
               analysis.summary.period_start,
@@ -1658,15 +1658,20 @@ function Workbench({
             </aside>
           </section>
           <footer className="page-footer">
-            <span>
-              <i />
-              Расчёт метрик: {analysis.elapsed_seconds.toFixed(2)} с
-            </span>
-            <span>Только наблюдаемые данные · без внешнего обогащения</span>
-            <span>
-              Анализ <code>{analysis.analysis_id.slice(0, 8)}</code> · v
-              {analysis.algorithm_version}
-            </span>
+            <div className="page-footer-meta">
+              <span>
+                <i />
+                Расчёт метрик: {analysis.elapsed_seconds.toFixed(2)} с
+              </span>
+              <span>Только наблюдаемые данные · без внешнего обогащения</span>
+              <span>
+                Анализ <code>{analysis.analysis_id.slice(0, 8)}</code> · v
+                {analysis.algorithm_version}
+              </span>
+            </div>
+            <p className="page-footer-credit">
+              Решение команды uniqore.ai на хакатоне hackalem.ai
+            </p>
           </footer>
         </main>
       </div>
