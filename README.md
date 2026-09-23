@@ -11,5 +11,6 @@ Hackathon team repository for Uniqore.ai
 - [Условия кейса и оригинальные источники](docs/finance/README.md).
 - [Архитектура: React, Python/FastAPI и светлый аналитический интерфейс](docs/finance/architecture.md).
 - [Ветки, локальная проверка и PR](docs/development-workflow.md).
+- [Agentic SDD pipeline: план разработки через Codex и Claude Code](docs/agentic-sdd-pipeline/README.md).
 
 Изменения выполняются в отдельных ветках и поступают через PR в `dev`. В `main` — только PR из `dev` после подтверждения локальной проверки. Реализация начинается по отдельной команде пользователя.

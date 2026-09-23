@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "run_id": "REPLACE_RUN_ID",
+  "feature_id": "REPLACE_FEATURE_ID",
+  "status": "WAITING_INPUT",
+  "baseline_ref": {"spec_version": "1", "artifacts_commit": null, "spec_sha256": null, "contract_versions": {}},
+  "code_base_commit": null,
+  "control_branch": null,
+  "integration_branch": null,
+  "mode": "interactive_agents",
+  "timeline": {"bootstrap_started_at": null, "feature_freeze_at": null, "deadline_at": null},
+  "max_parallel_workers": 2,
+  "tasks": [],
+  "events": [],
+  "integration_candidate": null,
+  "publication_authorization": {"action": "none", "target": null, "authorized_by": null, "user_message_ref": null, "expires_after_run": true}
+}
