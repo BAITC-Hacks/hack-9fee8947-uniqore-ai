@@ -10,7 +10,7 @@ from .analysis import DataError, json_write, load_and_analyze, verify_outputs, w
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Граф денег: локальный анализ и интерфейс расследования")
+    parser = argparse.ArgumentParser(description="Tyuin: локальный анализ финансовых связей и интерфейс расследования")
     parser.add_argument("command", choices=["run", "demo", "verify"])
     parser.add_argument("--data", type=Path, default=Path("data"))
     parser.add_argument("--out", type=Path, default=Path("out"))

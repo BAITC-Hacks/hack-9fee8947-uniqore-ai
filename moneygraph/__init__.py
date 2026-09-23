@@ -1,3 +1,3 @@
-"""Moneygraph: reproducible analysis and an evidence-first investigation UI."""
+"""Tyuin: reproducible analysis and an evidence-first investigation UI."""
 
 __version__ = "0.1.0"

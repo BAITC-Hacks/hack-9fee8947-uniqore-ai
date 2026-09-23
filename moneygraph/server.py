@@ -20,9 +20,13 @@ class ExplainRequest(BaseModel):
 
 
 def create_app(result: dict, out: Path) -> FastAPI:
-    app = FastAPI(title="Граф денег", version=result["algorithm_version"], docs_url=None, redoc_url=None)
+    app = FastAPI(title="Tyuin · Финансовые связи", version=result["algorithm_version"], docs_url=None, redoc_url=None)
     exports = {name: (out / name).read_bytes() for name in OUTPUTS}
     node_index = {n["gid"]: n for n in result["nodes"]}
+    # Detailed rule traces are needed for the selected dossier only. Keep graph
+    # loading and neighbor lists at their original payload size.
+    graph_nodes = [{key: value for key, value in n.items() if key != "role_explanation"} for n in result["nodes"]]
+    graph_node_index = {n["gid"]: n for n in graph_nodes}
     transactions: dict[str, list] = {gid: [] for gid in node_index}
     for tx in result["transactions"]:
         transactions[tx["src"]].append(tx)
@@ -44,7 +48,8 @@ def create_app(result: dict, out: Path) -> FastAPI:
 
     @app.get("/api/analysis")
     def analysis():
-        return {**{k: result[k] for k in ["analysis_id", "algorithm_version", "summary", "nodes", "edges", "clusters", "daily"]},
+        return {**{k: result[k] for k in ["analysis_id", "algorithm_version", "summary", "edges", "clusters", "daily"]},
+                "nodes": graph_nodes,
                 "elapsed_seconds": result["manifest"]["elapsed_seconds"],
                 "assistant_available": bool(os.getenv("LLM_BASE_URL") and os.getenv("LLM_MODEL") and os.getenv("LLM_API_KEY"))}
 
@@ -59,7 +64,7 @@ def create_app(result: dict, out: Path) -> FastAPI:
             day["n_tx"] += 1
         return {"analysis_id": result["analysis_id"], "node": selected,
                 "transactions": transactions[gid], "daily": sorted(days.values(), key=lambda d: d["date"]),
-                "neighbors": sorted((node_index[g] for g in neighbors[gid]), key=lambda n: n["rank"])}
+                "neighbors": sorted((graph_node_index[g] for g in neighbors[gid]), key=lambda n: n["rank"])}
 
     @app.get("/api/clusters/{cluster_id}")
     def cluster(cluster_id: int):
