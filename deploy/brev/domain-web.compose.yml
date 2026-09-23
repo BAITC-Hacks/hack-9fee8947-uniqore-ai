@@ -1,0 +1,33 @@
+# Optional overlay for direct HTTPS on a Linux Brev VM.
+# Combine with the repository's docker-compose.yml.
+services:
+  domain-web:
+    image: caddy:2.11.4@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TYUIN_DOMAIN: ${TYUIN_DOMAIN:?Set TYUIN_DOMAIN to the DNS hostname pointing to this VM}
+      TYUIN_PORT: ${TYUIN_PORT:-8765}
+    volumes:
+      - ./deploy/brev/caddy:/etc/caddy:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  caddy-data:
+  caddy-config:
