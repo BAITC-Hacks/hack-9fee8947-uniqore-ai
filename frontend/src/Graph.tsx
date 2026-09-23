@@ -99,10 +99,10 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
           selector: ".chosen",
           style: {
             "border-width": 5,
-            "border-color": "#cddfff",
+            "border-color": "#8ed8da",
             "font-size": 12,
             "font-weight": 600,
-            color: "#1c3358",
+            color: "#00313d",
             "z-index": 20,
           },
         },
@@ -117,8 +117,8 @@ export const Graph = forwardRef<GraphHandle, Props>(function Graph(props, ref) {
         {
           selector: ".selected-edge",
           style: {
-            "line-color": "#93afd7",
-            "target-arrow-color": "#749ccd",
+            "line-color": "#70b4bb",
+            "target-arrow-color": "#408d98",
             opacity: 0.85,
           },
         },

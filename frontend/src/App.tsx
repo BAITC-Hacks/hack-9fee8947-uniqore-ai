@@ -22,7 +22,6 @@ import {
   Sparkles,
   X,
   Minus,
-  Network,
   AlertTriangle,
   CornerDownRight,
 } from "lucide-react";
@@ -259,10 +258,14 @@ export function App() {
   if (!analysis)
     return (
       <div className="startup">
-        <div className="brand-symbol">
-          <Network size={29} />
-        </div>
-        <h1>Граф денег</h1>
+        <img
+          className="startup-logo"
+          src="/tyuin-logo.png"
+          alt="Tyuin — рысь-сыщик"
+          width="1793"
+          height="877"
+        />
+        <h1>Финансовые связи становятся понятными</h1>
         {error ? (
           <>
             <p>{error}</p>
@@ -283,11 +286,11 @@ export function App() {
     <div className="app-shell">
       <div className="app-body">
         <header className="topbar">
-          <a className="wordmark" href="/">
-            uniqore<span>.ai</span>
+          <a className="wordmark" href="/" aria-label="Tyuin — главная">
+            <img src="/tyuin-logo.png" alt="Tyuin" width="1793" height="877" />
           </a>
           <span className="header-divider" />
-          <span className="product-name">Граф денег</span>
+          <span className="product-name">Финансовые связи</span>
           <span className="workspace-period">Июль 2026</span>
           <div className="header-right">
             <span className="local-status">
