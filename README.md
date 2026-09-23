@@ -140,6 +140,7 @@ python scripts/smoke_local_launch.py --data data --out out/readme-check --port 8
 
 | Среда и версия | Реально выполнено | Доказательство |
 |---|---|---|
+| macOS arm64, Python 3.12.1, Node 25.8.1, commit `a91e3de` | 89 backend-тестов, 8 тестов графа, build, браузерная проверка текущего frontend; свежий smoke CLI/API/CSV/assets и остановка сервера прошли | [Текущая проверка и машинный отчёт](docs/finance/demo-filter-validation.md) |
 | Windows 11 x64, Python 3.12.14, commit `60276af` | 71 тест; preflight и `pip check`; CLI/API, 3 CSV, все assets, браузер, Ctrl+C и занятый порт. Новый процесс `run`: **6,7669 с**; весь smoke: **20,1606 с** | [Отчёт с SHA, командами и ограничениями](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/blob/834ecaf921e1c4551a33c80d7781cf1c6746acc5/docs/sdd/local-launch/reviews/T-004.md) |
 | Windows 11 x64, Python 3.14.5, commit `bb0c5d0` | Новый venv, установка lock, preflight, `pip check`, 14 тестов окружения. Полный smoke под 3.14 этим прогоном не подтверждён | [Отчёт Python 3.14](https://github.com/BAITC-Hacks/hack-9fee8947-uniqore-ai/blob/834ecaf921e1c4551a33c80d7781cf1c6746acc5/docs/sdd/local-launch/evidence/bb0c5d0/python314.json) |
 | macOS arm64, Python 3.12.1, исходная версия анализа | Новый процесс: **27,0019 с**, пиковая память **197,16 MiB**; отдельный повтор **7,59 с** | [Исходное измерение](results/benchmark.json), [повтор](results/repeat-benchmark.json), [контекст версии](docs/finance/validation.md) |

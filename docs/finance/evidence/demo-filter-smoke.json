@@ -1,0 +1,134 @@
+{
+  "status": "pass",
+  "started_at": "2026-09-23T11:47:26.164168+00:00",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "moneygraph",
+        "run",
+        "--data",
+        "data",
+        "--out",
+        "out/demo-filter-final-smoke-2"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "wall_seconds": 4.5098
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "moneygraph",
+        "verify",
+        "--data",
+        "data",
+        "--out",
+        "out/demo-filter-final-smoke-2"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "wall_seconds": 0.67
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "moneygraph",
+        "verify",
+        "--data",
+        "data",
+        "--out",
+        "results"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "wall_seconds": 0.6715
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "moneygraph",
+        "demo",
+        "--data",
+        "data",
+        "--out",
+        "out/demo-filter-final-smoke-2/demo",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8899"
+      ],
+      "cwd": ".",
+      "exit_code": -15,
+      "wall_seconds": 5.5944
+    }
+  ],
+  "method": "Fresh Python child including imports, analysis, CSV writes and verification; OS file cache not cleared. Runtime PATH excludes Node; child has no LLM settings. No browser or Ctrl+C claim.",
+  "peak_child_rss_mib": null,
+  "manual_browser": "not_run",
+  "manual_ctrl_c": "not_run",
+  "checked_commit": "a91e3dedad3d0099bfbe80f9f2cc389fe251d196",
+  "worktree_clean": true,
+  "environment": {
+    "python": "3.12.1",
+    "platform": "Darwin",
+    "machine": "arm64",
+    "node_on_child_path": false,
+    "child_llm_variables_present": false,
+    "dependency_versions": {
+      "fastapi": "0.141.1",
+      "uvicorn": "0.53.0",
+      "pandas": "2.3.3",
+      "pyarrow": "24.0.0",
+      "numpy": "2.5.3",
+      "scipy": "1.18.1",
+      "networkx": "3.7",
+      "httpx": "0.28.1"
+    }
+  },
+  "input_sha256": {
+    "nodes.parquet": "d2a45b0df6e9352832d5fb09839d10b9e23f898156c3bab263b051b31cc0296d",
+    "edges.parquet": "4e71dde5cd3115bcb26e91202665532ee6581cf8233a9fc8059ea59fb7358a38",
+    "transactions.parquet": "c30c5317b5439591dde86f2058dc47a3d19b2900c055ded994fe547f6fb7e7da"
+  },
+  "full_run_wall_seconds": 4.5098,
+  "analysis_id": "0a1216eed5476f02",
+  "output_sha256": {
+    "nodes_roles.csv": "482f5a94003c9ac811db932c3931600327c0cf5636a2f8c3eed382a2afe82297",
+    "clusters.csv": "5471ad6e32a921f5b6e354386a4ec1847d62b70a47105a254ed086a30538deda",
+    "top_nodes.csv": "8ad548bb145a6741b06e20355a7cbc21dc69280fd9f76d5ad865b6c6e3981164"
+  },
+  "reference_analysis_id": "0a1216eed5476f02",
+  "http": {
+    "health": "pass",
+    "analysis": "pass",
+    "dossiers_checked": 3,
+    "local_explanations_checked": 3,
+    "exports_checked": [
+      "nodes_roles.csv",
+      "clusters.csv",
+      "top_nodes.csv"
+    ],
+    "unknown_routes": "pass",
+    "assets_checked": [
+      "assets/graph-BB4DxJjf.js",
+      "assets/index-BgKjMl2D.css",
+      "assets/index-CgXS29-c.js",
+      "index.html",
+      "tyuin-icon.png",
+      "tyuin-logo.png"
+    ]
+  },
+  "cleanup": {
+    "method": "terminate",
+    "exit_code": -15,
+    "port_released": true,
+    "ok": true
+  },
+  "wall_seconds": 12.2544,
+  "finished_at": "2026-09-23T11:47:38.418949+00:00"
+}
