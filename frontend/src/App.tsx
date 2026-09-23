@@ -12,6 +12,7 @@ import {
   Download,
   Expand,
   FileText,
+  FileUp,
   Filter,
   GitBranch,
   Layers,
@@ -27,6 +28,21 @@ import {
   CornerDownRight,
 } from "lucide-react";
 import { Graph, GraphHandle } from "./Graph";
+import { DatasetUpload } from "./DatasetUpload";
+import {
+  datasetFetch,
+  DatasetApiError,
+  readDatasetSession,
+  writeDatasetSession,
+} from "./dataset";
+import {
+  calendarDay,
+  displayDate as date,
+  displayPeriod,
+  inDateRange,
+  isoDay,
+  timelineBins,
+} from "./dateRange";
 import { ClientRow } from "./ClientRow";
 import { RoleExplanation } from "./RoleExplanation";
 import { AssistantKeyDialog, AssistantPanel } from "./Assistant";
@@ -49,8 +65,6 @@ import {
 } from "./types";
 
 const pct = (n: number) => Math.round(n * 100);
-const date = (value: string) => `${value.slice(-2)}.07`;
-const emptyDays: [number, number] = [1, 31];
 const fullAmount = (n: number) =>
   new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(n) + " ₸";
 
@@ -68,6 +82,77 @@ function RoleBadge({ node }: { node: GraphNode }) {
 }
 
 export function App() {
+  const [datasetId, setDatasetId] = useState(readDatasetSession);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const [notice, setNotice] = useState("");
+  const release = async (id: string) => {
+    if (!id) return;
+    try {
+      await datasetFetch("/api/datasets/current", id, { method: "DELETE" });
+    } catch (caught) {
+      if (!(caught instanceof DatasetApiError && caught.status === 410))
+        setNotice(
+          "Предыдущий временный набор не удалось удалить с сервера. Он станет недоступен по истечении часа или при перезапуске сервера.",
+        );
+    }
+  };
+  const switchDataset = (id: string) => {
+    const previous = datasetId;
+    writeDatasetSession(id);
+    setDatasetId(id);
+    setExpired(false);
+    setNotice("");
+    setUploadOpen(false);
+    if (previous !== id) void release(previous);
+  };
+  return (
+    <>
+      <Workbench
+        key={datasetId || "startup"}
+        datasetId={datasetId}
+        expired={expired}
+        notice={notice}
+        onExpired={() => setExpired(true)}
+        onUpload={() => setUploadOpen(true)}
+        onRestore={() => switchDataset("")}
+      />
+      {uploadOpen && (
+        <DatasetUpload
+          onClose={() => setUploadOpen(false)}
+          onUploaded={switchDataset}
+        />
+      )}
+    </>
+  );
+}
+
+function Workbench({
+  datasetId,
+  expired,
+  notice,
+  onExpired,
+  onUpload,
+  onRestore,
+}: {
+  datasetId: string;
+  expired: boolean;
+  notice: string;
+  onExpired: () => void;
+  onUpload: () => void;
+  onRestore: () => void;
+}) {
+  const requestDataset = async (url: string, options: RequestInit = {}) => {
+    try {
+      return await datasetFetch(url, datasetId, options);
+    } catch (caught) {
+      if (caught instanceof DatasetApiError && caught.status === 410)
+        onExpired();
+      throw caught;
+    }
+  };
+  const [requestError, setRequestError] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState("");
@@ -105,7 +190,7 @@ export function App() {
   const [highlightMatches, setHighlightMatches] = useState(false);
   const [hops, setHops] = useState(1);
   const [colorBy, setColorBy] = useState<"role" | "cluster">("role");
-  const [days, setDays] = useState<[number, number]>(emptyDays);
+  const [days, setDays] = useState<[number, number]>([0, 0]);
   const [visible, setVisible] = useState(0);
   const [detailTab, setDetailTab] = useState<
     "overview" | "priority" | "transactions" | "assistant"
@@ -155,13 +240,17 @@ export function App() {
 
   useEffect(() => {
     const abort = new AbortController();
-    fetch("/api/analysis", { signal: abort.signal })
+    requestDataset("/api/analysis", { signal: abort.signal })
       .then((r) => {
         if (!r.ok) throw Error("Не удалось загрузить анализ");
         return r.json();
       })
       .then((data: Analysis) => {
         setAnalysis(data);
+        setDays([
+          calendarDay(data.summary.period_start),
+          calendarDay(data.summary.period_end),
+        ]);
         setSelected(
           [...data.nodes].sort((a, b) => a.rank - b.rank)[0]?.gid || "",
         );
@@ -184,7 +273,9 @@ export function App() {
     setEdge(pendingEdge.current);
     pendingEdge.current = null;
     setCopied(false);
-    fetch(`/api/nodes/${selected}`, { signal: abort.signal })
+    requestDataset(`/api/nodes/${encodeURIComponent(selected)}`, {
+      signal: abort.signal,
+    })
       .then((r) => {
         if (!r.ok) throw Error("Не удалось открыть досье");
         return r.json();
@@ -277,8 +368,7 @@ export function App() {
   );
   const filteredTx = (dossier?.transactions || []).filter(
     (t) =>
-      Number(t.date.slice(-2)) >= days[0] &&
-      Number(t.date.slice(-2)) <= days[1] &&
+      inDateRange(t.date, days) &&
       (!edge || (t.src === edge.src && t.dst === edge.dst)),
   );
   const selectedOutside =
@@ -410,6 +500,40 @@ export function App() {
     } else setEdge(e);
     setDetailTab("transactions");
   };
+  const exportFile = async (file: string) => {
+    setExporting(true);
+    setRequestError("");
+    try {
+      const response = await requestDataset(`/api/exports/${file}`);
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportOpen(false);
+    } catch (caught) {
+      setRequestError(
+        caught instanceof Error ? caught.message : "Не удалось выгрузить CSV.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+  const fullDays: [number, number] = analysis
+    ? [
+        calendarDay(analysis.summary.period_start),
+        calendarDay(analysis.summary.period_end),
+      ]
+    : [0, 0];
+  const bins = timelineBins(dossier?.daily || [], fullDays);
+  const timelineMax = Math.max(
+    1,
+    ...bins.map((bin) => Math.max(bin.in_amount, bin.out_amount)),
+  );
+  const selectedPeriod = displayPeriod(isoDay(days[0]), isoDay(days[1]));
   if (!analysis)
     return (
       <div className="startup">
@@ -424,9 +548,19 @@ export function App() {
         {error ? (
           <>
             <p>{error}</p>
-            <button className="primary" onClick={() => location.reload()}>
-              Повторить
-            </button>
+            <div className="startup-actions">
+              <button className="primary" onClick={() => location.reload()}>
+                Повторить
+              </button>
+              {datasetId && (
+                <button className="secondary" onClick={onRestore}>
+                  Вернуть исходный набор
+                </button>
+              )}
+              <button className="secondary" onClick={onUpload}>
+                Загрузить данные
+              </button>
+            </div>
           </>
         ) : (
           <>
@@ -446,12 +580,20 @@ export function App() {
           </a>
           <span className="header-divider" />
           <span className="product-name">Финансовые связи</span>
-          <span className="workspace-period">Июль 2026</span>
+          <span className="workspace-period">
+            {displayPeriod(
+              analysis.summary.period_start,
+              analysis.summary.period_end,
+            )}
+          </span>
           <div className="header-right">
             <span className="local-status">
               <i />
               Локальный анализ
             </span>
+            <button className="secondary upload-button" onClick={onUpload}>
+              <FileUp size={16} /> Загрузить данные
+            </button>
             <button
               className={`assistant-key-control ${apiKey ? "connected" : ""}`}
               onClick={() => setKeyDialogOpen(true)}
@@ -485,7 +627,7 @@ export function App() {
               {exportOpen && (
                 <div className="export-menu">
                   <p className="export-scope">
-                    Весь набор · полный месяц.
+                    Весь набор · полный период.
                     <br />
                     Фильтры и перечень проверки не меняют CSV.
                   </p>
@@ -494,11 +636,10 @@ export function App() {
                     ["clusters.csv", "Сообщества"],
                     ["top_nodes.csv", "Топ-20 всего набора"],
                   ].map(([file, label]) => (
-                    <a
+                    <button
                       key={file}
-                      href={`/api/exports/${file}`}
-                      download
-                      onClick={() => setExportOpen(false)}
+                      onClick={() => void exportFile(file)}
+                      disabled={exporting}
                     >
                       <FileText size={17} />
                       <span>
@@ -506,7 +647,7 @@ export function App() {
                         <small>{file}</small>
                       </span>
                       <ArrowUpRight size={14} />
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}
@@ -514,8 +655,21 @@ export function App() {
           </div>
         </header>
         <main>
+          {(expired || notice || requestError) && (
+            <div className="dataset-notice" role="alert">
+              <span>
+                {expired
+                  ? "Загруженный набор больше недоступен. Загрузите его снова или вернитесь к исходному набору."
+                  : requestError || notice}
+              </span>
+              {expired && (
+                <button onClick={onRestore}>Вернуть исходный набор</button>
+              )}
+            </div>
+          )}
           <DatasetPassport
             analysis={analysis}
+            onRestore={datasetId ? onRestore : undefined}
             onNetwork={() => {
               clearFilters();
               setActiveCluster(null);
@@ -1075,95 +1229,95 @@ export function App() {
                     <Activity size={14} />
                     Операции клиента
                   </span>
-                  <strong>
-                    {String(days[0]).padStart(2, "0")} —{" "}
-                    {String(days[1]).padStart(2, "0")} июля
-                  </strong>
+                  <strong>{selectedPeriod}</strong>
                   <button
-                    onClick={() => setDays([1, 31])}
-                    disabled={days[0] === 1 && days[1] === 31}
+                    onClick={() => setDays(fullDays)}
+                    disabled={
+                      days[0] === fullDays[0] && days[1] === fullDays[1]
+                    }
                   >
                     Сбросить
                   </button>
                 </div>
-                <div className="bars">
-                  {Array.from({ length: 31 }, (_, i) => {
-                    const d = dossier?.daily.find(
-                      (d) => Number(d.date.slice(-2)) === i + 1,
-                    );
-                    const max = Math.max(
-                      1,
-                      ...(dossier?.daily || []).map((d) =>
-                        Math.max(d.in_amount, d.out_amount),
-                      ),
+                <div
+                  className={bins.length > 40 ? "bars compact-bars" : "bars"}
+                >
+                  {bins.map((bin) => {
+                    const label = displayPeriod(
+                      isoDay(bin.start),
+                      isoDay(bin.end),
                     );
                     return (
-                      <div
-                        key={i}
+                      <button
+                        key={bin.start}
+                        type="button"
                         className={
-                          i + 1 < days[0] || i + 1 > days[1]
+                          bin.end < days[0] || bin.start > days[1]
                             ? "day-bar muted"
                             : "day-bar"
                         }
-                        title={`${i + 1} июля · вход ${fullAmount(d?.in_amount || 0)} · выход ${fullAmount(d?.out_amount || 0)}`}
-                        onClick={() => setDays([i + 1, i + 1])}
+                        title={`${label} · вход ${fullAmount(bin.in_amount)} · выход ${fullAmount(bin.out_amount)}`}
+                        aria-label={`${label}: вход ${fullAmount(bin.in_amount)}, выход ${fullAmount(bin.out_amount)}`}
+                        onClick={() => setDays([bin.start, bin.end])}
                       >
                         <i
                           style={{
-                            height: `${d ? (d.in_amount / max) * 100 : 0}%`,
+                            height: `${(bin.in_amount / timelineMax) * 100}%`,
                           }}
                         />
                         <b
                           style={{
-                            height: `${d ? (d.out_amount / max) * 100 : 0}%`,
+                            height: `${(bin.out_amount / timelineMax) * 100}%`,
                           }}
                         />
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
                 <div className="range-inputs">
                   <input
                     aria-label="Начало периода"
+                    aria-valuetext={date(isoDay(days[0]))}
                     type="range"
-                    min="1"
-                    max="31"
+                    min={fullDays[0]}
+                    max={fullDays[1]}
+                    disabled={fullDays[0] === fullDays[1]}
                     value={days[0]}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setDays([
-                        +e.target.value,
-                        Math.max(+e.target.value, days[1]),
+                        +event.target.value,
+                        Math.max(+event.target.value, days[1]),
                       ])
                     }
                   />
                   <input
                     aria-label="Конец периода"
+                    aria-valuetext={date(isoDay(days[1]))}
                     type="range"
-                    min="1"
-                    max="31"
+                    min={fullDays[0]}
+                    max={fullDays[1]}
+                    disabled={fullDays[0] === fullDays[1]}
                     value={days[1]}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setDays([
-                        Math.min(days[0], +e.target.value),
-                        +e.target.value,
+                        Math.min(days[0], +event.target.value),
+                        +event.target.value,
                       ])
                     }
                   />
                 </div>
                 <div className="timeline-foot">
-                  <span>01 июл</span>
+                  <span>{date(analysis.summary.period_start)}</span>
                   <span>
-                    <i className="in-dot" />
-                    Вход
-                    <i className="out-dot" />
-                    Выход
+                    <i className="in-dot" /> Вход
+                    <i className="out-dot" /> Выход
                   </span>
-                  <span>31 июл</span>
+                  <span>{date(analysis.summary.period_end)}</span>
                 </div>
               </div>
               <p className="period-scope">
                 Даты меняют показ операций и яркость связей. Роли, приоритеты,
-                суммы и CSV — за весь месяц.
+                суммы и CSV — за весь период набора.
               </p>
             </section>
             <aside className="dossier-panel">
@@ -1405,8 +1559,7 @@ export function App() {
                             )}
                           </div>
                           <p className="micro-note">
-                            {days[0]}–{days[1]} июля · суммы из исходной
-                            выгрузки
+                            {selectedPeriod} · суммы из исходной выгрузки
                           </p>
                           {edge && (
                             <div className="edge-banner">
@@ -1543,7 +1696,14 @@ export function App() {
           </button>
           <div className="eyebrow">ПРОЗРАЧНАЯ АНАЛИТИКА</div>
           <h2 id="help-title">Справка и данные</h2>
-          <p>Наблюдаемая сеть переводов за 1–31 июля 2026 года.</p>
+          <p>
+            Наблюдаемая сеть переводов за{" "}
+            {displayPeriod(
+              analysis.summary.period_start,
+              analysis.summary.period_end,
+            )}
+            .
+          </p>
           <dl className="dataset-summary">
             <div>
               <dt>Клиенты</dt>
@@ -1618,8 +1778,8 @@ export function App() {
               анализе.
             </li>
             <li>
-              Только июль 2026, один банк, суммы от 5 000 ₸. Полные балансы
-              неизвестны.
+              Только загруженные операции за указанный период, суммы от 5 000 ₸.
+              Полные балансы неизвестны.
             </li>
             <li>
               Роли рассчитаны правилами; эталонной разметки для оценки accuracy
